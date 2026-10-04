@@ -3,3 +3,6 @@ node_modules/
 runs/
 *.tmp
 state.lock
+# control-plane state lives on the orphan branch orchestra-state, never on main
+data/
+state/

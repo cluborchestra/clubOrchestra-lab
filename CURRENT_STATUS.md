@@ -1,6 +1,6 @@
 # CURRENT_STATUS — clubOrchestra-lab
 
-**Updated:** 2026-10-04 · **Tasks:** CO-P1-001, CO-P2a-001 · **Phase:** P2a (GitHub loop, local only)
+**Updated:** 2026-10-04 · **Tasks:** CO-P1-001, CO-P2a-001, CO-P2b-001 · **Phase:** P2b (GitHub wiring; no real run yet)
 Tags: PLANNED / IMPLEMENTED / TESTED / E2E_VERIFIED / DISABLED (spec §8).
 TESTED = covered by an automated test in `test/` that passes with `npm test`.
 
@@ -9,7 +9,7 @@ on 2026-10-04 (local only; no remote, CI or PR yet — repo creation is OWNER_AP
 
 | # | Capability | Status | Where | Proof |
 |---|---|---|---|---|
-| 1 | Scaffold: state.json, event intake, processed_events.json, audit JSONL, approvals/ | TESTED | `src/store.js`, `data/` | all tests run on a fresh scaffold |
+| 1 | Scaffold: state.json, event intake, processed_events.json, audit JSONL, approvals/ | TESTED | `src/store.js`; on GitHub: branch `orchestra-state` | all tests run on a fresh scaffold |
 | 2 | State machine, only legal transitions; illegal rejected + logged | TESTED | `src/states.js` | `state machine: illegal transition…` |
 | 3 | Envelope validation, fail closed → BLOCKED / NEEDS_HUMAN | TESTED | `src/events.js` | `fail closed: event missing "<field>"` ×11, unparseable, wrong project/type |
 | 4 | Idempotency (`processed_events.json`) | TESTED | `src/controlPlane.js` | `idempotency: …` ×2 |
@@ -33,34 +33,42 @@ on 2026-10-04 (local only; no remote, CI or PR yet — repo creation is OWNER_AP
 | 2 | Adapter idempotency: `event_id = gh-run-<runId>-<runAttempt>`; redelivery = no-op | TESTED | `src/adapters/github.js` | `adapter idempotency: …` ×2 |
 | 3 | Exact-SHA gate: sha ≠ pending / head moved / CI before worker → no work, logged stale | TESTED | `src/controlPlane.js`, `src/gitRefs.js` | `exact-SHA: …` ×3 |
 | 4 | Reconcile after restart (git head + durable state), no repeated work | TESTED | `src/controlPlane.js` (`reconcile`, `resume`) | `reconcile: …` ×4 |
-| 5 | Workflow files: `ci.yml` + `orchestrator.yml` with `concurrency` | IMPLEMENTED (files only) | `.github/workflows/` | static checks in `workflow files: …`; **never executed** |
+| 5 | Workflow files: `ci.yml` + `orchestrator.yml` with `concurrency` | IMPLEMENTED (files only) | `.github/workflows/` | static checks moved to `test/p2b-github-wiring.test.js`; **never executed** |
 | 6 | Local harness: whole chain offline, no human "continue" | TESTED | `harness/` | `full local chain: …`, `deterministic: …` |
 | — | CI failure + planner-review rejection go through the circuit breaker | TESTED | `src/controlPlane.js` | `CI failure …`, `planner review REJECT …` |
 | — | `ingest` CLI (what the orchestrator workflow runs) | TESTED | `src/cli.js`, `src/ingest.js` | `cli ingest: …` |
-| 7 | Full suite green: P1 (31) + P2a (20) = 51 | TESTED | — | `npm test` |
+| 7 | Full suite green (now 55: P1 31 + P2a 19 + P2b 5) | TESTED | — | `npm test` |
 | 8 | Offline: no network modules; harness spawns only local `git` | TESTED | — | `offline: …` ×2 |
 
-## P2b — on a real GitHub remote: OWNER_APPROVAL_REQUIRED
+## P2b — GitHub wiring (CO-P2b-001)
 
-None of this has been started. Each item needs a GitHub remote, a token, or both.
+Repo: https://github.com/cluborchestra/clubOrchestra-lab (public, approved by Product Owner).
+**P2b: IMPLEMENTED + TESTED (local) — NOT E2E_VERIFIED.** No Actions run has happened.
 
-| Item | Status |
-|---|---|
-| Create the GitHub repo `clubOrchestra-lab` and push this branch | OWNER_APPROVAL_REQUIRED |
-| Enable Actions; pin `actions/checkout` / `actions/setup-node` to full commit SHAs | OWNER_APPROVAL_REQUIRED |
-| Grant `contents: write` to the orchestrator (`GITHUB_TOKEN`) so it can commit `data/` | OWNER_APPROVAL_REQUIRED |
-| Branch protection on `main` that still allows the orchestrator's state commits | OWNER_APPROVAL_REQUIRED |
-| Wire dispatch: `data/outbox/<task>.json` → `repository_dispatch` → worker workflow | PLANNED (P2b) |
-| Watchdog `schedule` workflow (stale lease / lost event / stall → reconcile, never a 2nd writer) | PLANNED (P2b) |
-| First real E2E run: push → CI → orchestrator → state commit; duplicate redelivery + stale-SHA on GitHub | PLANNED (P2b) → E2E_VERIFIED |
+| Item | Status | Where / proof |
+|---|---|---|
+| Remote added; `main` = P1 (`7799664`); feature branches + `orchestra-state` pushed | IMPLEMENTED | git remote `origin` |
+| Adapter ignores CI from non-`co/` branches (PR CI can't block the loop) | TESTED | `src/adapters/github.js`; `test/p2b-github-wiring.test.js` |
+| Orchestrator wired to the state-branch pattern (`orchestra-state`, never pushes to `main`) | TESTED (static) | `.github/workflows/orchestrator.yml`; `orchestrator: state-branch pattern …` |
+| Orchestrator DISABLED: job gated on `vars.ORCHESTRATOR_ENABLED == 'true'` + push-CI + own repo | TESTED (static) | `orchestrator: disabled unless …` |
+| Actions pinned to commit SHAs (checkout v4.4.0, setup-node v4.4.0) | TESTED (static) | `workflows: actions pinned …` |
+| `data/` removed from code branches; state only on `orchestra-state` | IMPLEMENTED | `.gitignore`, branch `orchestra-state` |
+| `main` set as default + branch protection | OWNER (GitHub UI) | settings checklist in the PR description |
+| P2b PR into `main` | OWNER (GitHub UI) | no authenticated GitHub API/CLI on this machine |
+| First real run (set `ORCHESTRATOR_ENABLED=true`, push a `co/` branch) | OWNER_APPROVAL_REQUIRED | → E2E_VERIFIED only after it runs |
+| Wire dispatch: `outbox/<task>.json` → `repository_dispatch` → worker workflow | PLANNED | after first real run |
+| Watchdog `schedule` workflow (stall → reconcile, never a 2nd writer) | PLANNED | after first real run |
 
-Nothing is E2E_VERIFIED yet: everything runs locally against simulated workers and a scratch git repo.
+Nothing is E2E_VERIFIED yet.
 
 ## Known limitations
 
 - `state.lock` + `version` is the local lock. On GitHub, `orchestrator.yml` adds Actions
-  `concurrency` and a non-forced push of `data/` (rejected if `main` moved). This is authored
-  but not yet exercised (P2b).
+  `concurrency` and a non-forced push to `orchestra-state` (rejected if that branch moved). This
+  is authored but not yet exercised.
+- `orchestra-state` starts from the generic scaffold (`last_verified_sha` = 40 zeros, `branch: main`).
+  Before the first real run it must be initialised with the real `main` sha; that is part of the
+  first-run approval.
 - `processed_events.json` is written right after `state.json` under the same lease. A crash between
   the two can let an event be re-read; it is then stale (no longer the current task) and ignored.
 - The sim worker keeps its attempt counter in memory. Across separate CLI invocations a retried

@@ -59,8 +59,9 @@ test('adapter: not-ours deliveries are ignored; malformed ones yield an invalid 
   assert.ok(workflowRunToEvent(run({ action: 'requested' }), opts).ignored);
   assert.ok(workflowRunToEvent(run({ name: 'Deploy' }), opts).ignored);
   assert.ok(workflowRunToEvent(run({ repo: 'someone/else' }), opts).ignored);
+  assert.ok(workflowRunToEvent(run({ branch: 'main' }), opts).ignored);
 
-  for (const bad of [run({ branch: 'main' }), run({ branch: 'co/../x' }), run({ sha: 'nothex' }), run({ id: -1 }), run({ updated_at: undefined }), 'garbage', null]) {
+  for (const bad of [run({ branch: undefined }), run({ branch: 'co/../x' }), run({ branch: 'co/' }), run({ sha: 'nothex' }), run({ id: -1 }), run({ updated_at: undefined }), 'garbage', null]) {
     const { event } = workflowRunToEvent(bad, opts);
     assert.equal(validateEvent(event, { project_id: PROJECT }).ok, false, JSON.stringify(bad));
   }
@@ -284,31 +285,6 @@ test('cli ingest: workflow_run file -> control plane step -> next task written t
   assert.equal(after.current_task_id, 'CO-SIM-002');
   assert.ok(fs.existsSync(path.join(loop.controlDir, 'outbox', 'CO-SIM-002.json')));
   assert.ok(kinds(loop.cp, 'ingest_ignored').length === 1);
-});
-
-// ---- 5. workflow files --------------------------------------------------------------------------------
-test('workflow files: authored with concurrency single-writer, least privilege, no secrets, no injection', () => {
-  const wf = (f) => fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', f), 'utf8');
-  const ci = wf('ci.yml');
-  const orch = wf('orchestrator.yml');
-
-  assert.match(ci, /^name: CI$/m);
-  assert.match(ci, /branches: \['co\/\*\*'\]/);
-  assert.match(ci, /permissions:\n\s+contents: read/);
-
-  assert.match(orch, /workflow_run:\n\s+workflows: \[CI\]\n\s+types: \[completed\]/);
-  assert.match(orch, /^concurrency:\n\s+group: clubOrchestra\n\s+cancel-in-progress: false$/m);
-  assert.match(orch, /node src\/cli\.js ingest data "\$GITHUB_EVENT_PATH"/);
-  assert.match(orch, /git push origin HEAD:main/);
-  assert.doesNotMatch(orch, /push .*(--force|-f\b)/);
-
-  for (const text of [ci, orch]) {
-    assert.doesNotMatch(text, /secrets\./);
-    assert.match(text, /^permissions:/m);
-    // no ${{ github.event... }} inside run: commands (script injection)
-    const runLines = text.split('\n').filter((l) => /^\s+(- )?run:|^\s{10}\S/.test(l));
-    for (const l of runLines) assert.doesNotMatch(l, /\$\{\{\s*github\.event/, l);
-  }
 });
 
 // ---- 8. offline guard ------------------------------------------------------------------------------------

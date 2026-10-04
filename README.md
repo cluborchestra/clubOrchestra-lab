@@ -6,7 +6,10 @@ clubOrchestra control plane with simulated workers.
   breaker, approval gate, audit.
 - **P2a:** the GitHub loop proven **locally**. A CI `workflow_run` result becomes an event,
   exact-SHA gating applies, duplicate and stale events are no-ops, and the control plane
-  reconciles after a restart. Workflow files are authored but not run against any remote.
+  reconciles after a restart.
+- **P2b:** wired to GitHub: https://github.com/cluborchestra/clubOrchestra-lab (public). State
+  lives on the orphan branch `orchestra-state`. The orchestrator workflow is **disabled** until
+  the Product Owner enables it. Nothing has run on real Actions yet.
 
 Canonical spec: [clubOrchestra_verkefna_og_vinnuplan_v0.1.md](clubOrchestra_verkefna_og_vinnuplan_v0.1.md).
 Status per feature: [CURRENT_STATUS.md](CURRENT_STATUS.md).
@@ -89,9 +92,10 @@ src/
   cli.js           offline CLI
 harness/           P2a local loop: scratch git repo, git-committing sim worker, sim CI, event pump
 .github/workflows/ ci.yml (CI placeholder), orchestrator.yml (workflow_run -> ingest; concurrency)
-                   authored only, NOT run against a remote (P2b)
+                   orchestrator gated off by repo variable ORCHESTRATOR_ENABLED (see below)
 test/              node:test suites (no dependencies)
-data/              committed empty scaffold (state.json IDLE, empty inbox/audit, approvals/)
+data/              local only (gitignored); `node src/cli.js init data` creates the scaffold.
+                   On GitHub the state lives on branch orchestra-state (data/ only).
 docs/evidence/     sample audit logs / state / approval record from simulated runs
 ```
 
@@ -144,3 +148,32 @@ a worker:
 | awaiting worker, no commit | `no_commit_yet`: keep waiting |
 | awaiting CI, head == pending sha | `consistent` |
 | awaiting CI, head moved | `branch_moved` → `BLOCKED` / NEEDS_HUMAN |
+
+## P2b: GitHub wiring
+
+| Branch | Holds | Written by |
+|---|---|---|
+| `main` (protected, default) | code: P1 → P2a → P2b | PRs only |
+| `co/<task_id>` | one task's work | the worker (simulated now, real in P3) |
+| `orchestra-state` (orphan) | `data/` only: state, inbox, audit, approvals | the orchestrator only; never merged into `main` |
+
+Flow on GitHub, once enabled:
+
+1. A push to `co/<task>` runs **CI**.
+2. When CI completes, a `workflow_run` event triggers the **Orchestrator**.
+3. The Orchestrator checks out `main` (code) and `orchestra-state` (into `state/`).
+4. It fetches the `co/*` heads and runs `node src/cli.js ingest state/data …`.
+5. It does a plain (non-forced) push of `state/` to `orchestra-state`. If the branch moved, the
+   push is rejected, which is the optimistic lock.
+
+**Orchestrator off switch:** the `ingest` job runs only when all three hold:
+
+- the repository variable `ORCHESTRATOR_ENABLED` is exactly `true`;
+- the CI run came from a `push`, not a PR;
+- the CI run belongs to this repo.
+
+Unset (the default) means every trigger ends with the job skipped. Only the Product Owner
+enables it.
+
+CI runs on feature-branch PRs are ignored by the adapter: their branch isn't `co/`, so the result
+is "not ours" and can't block the loop.

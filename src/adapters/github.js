@@ -33,6 +33,12 @@ function workflowRunToEvent(gh, { project_id, repo_full_name = null, workflows =
   if (!workflows.includes(run.name)) return { ignored: true, reason: `workflow ${String(run.name)} is not a CI workflow` };
   const fullName = isPlainObject(gh.repository) ? gh.repository.full_name : undefined;
   if (repo_full_name !== null && fullName !== repo_full_name) return { ignored: true, reason: 'foreign repository' };
+  // CI also runs on non-task branches (e.g. feature-branch PRs). Those results are not ours: ignore
+  // them instead of turning them into an invalid event that would block the loop. A branch that
+  // claims the task prefix but carries a malformed task id still yields an invalid event (fail closed).
+  if (typeof run.head_branch === 'string' && !run.head_branch.startsWith(POLICY.task_branch_prefix)) {
+    return { ignored: true, reason: `branch ${run.head_branch} is not a task branch` };
+  }
 
   const event = {
     schema_version: 1,

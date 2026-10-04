@@ -1,5 +1,6 @@
-# CI placeholder (P2a: authored, NOT yet run against a remote; enabling it is P2b = OWNER_APPROVAL_REQUIRED).
-# Runs on every push to a task branch (co/<task_id>). Its completion fires orchestrator.yml via workflow_run.
+# CI: runs the test suite on every push to a task branch (co/<task_id>) and on pull requests.
+# Completion of a co/* push run fires orchestrator.yml via workflow_run (the orchestrator itself
+# stays disabled until the repository variable ORCHESTRATOR_ENABLED is "true").
 name: CI
 
 on:
@@ -15,9 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # P2b: pin third-party actions to full commit SHAs before enabling.
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
       - run: npm test
