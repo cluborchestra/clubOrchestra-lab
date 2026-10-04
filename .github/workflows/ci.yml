@@ -1,0 +1,23 @@
+# CI placeholder (P2a: authored, NOT yet run against a remote; enabling it is P2b = OWNER_APPROVAL_REQUIRED).
+# Runs on every push to a task branch (co/<task_id>). Its completion fires orchestrator.yml via workflow_run.
+name: CI
+
+on:
+  push:
+    branches: ['co/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # P2b: pin third-party actions to full commit SHAs before enabling.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test

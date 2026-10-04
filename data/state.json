@@ -6,6 +6,8 @@
   "current_task_id": null,
   "current_task": null,
   "current_owner": null,
+  "awaiting": null,
+  "pending_ci_sha": null,
   "lease_until": null,
   "repo": "clubOrchestra-lab",
   "branch": "main",

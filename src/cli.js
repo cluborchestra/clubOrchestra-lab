@@ -10,12 +10,18 @@
 //   node src/cli.js approve <dir> <approval_id> --by <name>
 //   node src/cli.js deny <dir> <approval_id> --by <name>
 //   node src/cli.js reset <dir> --by <name>     human reset BLOCKED -> IDLE
+//   node src/cli.js ingest <dir> <workflow_run.json> --git-dir <path> [--repo owner/name]
+//       P2 entry point used by .github/workflows/orchestrator.yml: GitHub workflow_run payload ->
+//       adapter -> intake -> control plane steps (CI-gated, head read from --git-dir).
 
 const fs = require('node:fs');
 const path = require('node:path');
 const { ControlPlane } = require('./controlPlane');
 const { SimPlanner, DEFAULT_PLAN } = require('./sim/planner');
 const { SimWorker } = require('./sim/worker');
+const { OutboxWorker } = require('./outboxWorker');
+const { GitRefs } = require('./gitRefs');
+const { ingestWorkflowRun } = require('./ingest');
 
 const APPROVAL_PLAN = [DEFAULT_PLAN[0], { task_id: 'CO-SIM-003', action: 'deploy', objective: 'Simulated deploy (approval-gated)' }];
 
@@ -95,6 +101,29 @@ function main(argv) {
     case 'deny':
       decide(args[0], args[1], flag(args, '--by'), 'denied');
       return 0;
+    case 'ingest': {
+      const [dir, file] = args;
+      const gitDir = flag(args, '--git-dir');
+      if (!dir || !file || !gitDir) throw new Error('usage: ingest <dir> <workflow_run.json> --git-dir <path> [--repo owner/name]');
+      const cp = new ControlPlane({
+        dir, planner: new SimPlanner(), worker: new OutboxWorker(dir), requireCi: true, repo: new GitRefs(gitDir),
+      });
+      const raw = fs.readFileSync(file, 'utf8');
+      let gh;
+      try { gh = JSON.parse(raw); } catch { gh = undefined; }
+      if (gh === undefined) {
+        cp.intake(raw); // unparseable: let the control plane reject it and fail closed
+      } else {
+        const out = ingestWorkflowRun(cp, gh, { repo_full_name: flag(args, '--repo') || null });
+        if (out.ignored) {
+          console.log(JSON.stringify({ ignored: true, reason: out.reason }));
+          return 0;
+        }
+      }
+      const r = cp.run();
+      console.log(JSON.stringify({ stopped: r.stopped, steps: r.steps, ...summary(cp) }, null, 2));
+      return 0;
+    }
     case 'reset': {
       const by = flag(args, '--by');
       makeCp(args[0]).humanReset({ by });
@@ -102,7 +131,7 @@ function main(argv) {
       return 0;
     }
     default:
-      console.error('usage: node src/cli.js <demo|demo-approval|init|run|status|approve|deny|reset> ...');
+      console.error('usage: node src/cli.js <demo|demo-approval|init|run|status|approve|deny|reset|ingest> ...');
       return 2;
   }
 }
