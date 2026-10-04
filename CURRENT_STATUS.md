@@ -47,7 +47,7 @@ Repo: https://github.com/cluborchestra/clubOrchestra-lab (public, approved by Pr
 
 | Item | Status | Where / proof |
 |---|---|---|
-| Remote added; `main` = P1 (`7799664`); feature branches + `orchestra-state` pushed | IMPLEMENTED | git remote `origin` |
+| Remote added; `main` = P1 (`4b935cc`); feature branches + `orchestra-state` pushed | IMPLEMENTED | git remote `origin` |
 | Adapter ignores CI from non-`co/` branches (PR CI can't block the loop) | TESTED | `src/adapters/github.js`; `test/p2b-github-wiring.test.js` |
 | Orchestrator wired to the state-branch pattern (`orchestra-state`, never pushes to `main`) | TESTED (static) | `.github/workflows/orchestrator.yml`; `orchestrator: state-branch pattern …` |
 | Orchestrator DISABLED: job gated on `vars.ORCHESTRATOR_ENABLED == 'true'` + push-CI + own repo | TESTED (static) | `orchestrator: disabled unless …` |
