@@ -4,6 +4,9 @@
 Tags: PLANNED / IMPLEMENTED / TESTED / E2E_VERIFIED / DISABLED (spec §8).
 TESTED = covered by an automated test in `test/` that passes with `npm test`.
 
+**P1 control plane: IMPLEMENTED + TESTED (local) — NOT E2E_VERIFIED.** QA accepted CO-P1-001
+on 2026-10-04 (local only; no remote, CI or PR yet — repo creation is OWNER_APPROVAL_REQUIRED).
+
 | # | Capability | Status | Where | Proof |
 |---|---|---|---|---|
 | 1 | Scaffold: state.json, event intake, processed_events.json, audit JSONL, approvals/ | TESTED | `src/store.js`, `data/` | all tests run on a fresh scaffold |
