@@ -1,0 +1,13 @@
+{
+  "name": "cluborchestra-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "clubOrchestra P1 control plane with simulated planner + worker (offline, zero dependencies)",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "demo": "node src/cli.js demo",
+    "demo:approval": "node src/cli.js demo-approval"
+  }
+}

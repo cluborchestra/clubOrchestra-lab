@@ -1,0 +1,12 @@
+{"ts":"2026-10-04T18:09:49.167Z","actor":"human","event_id":null,"task_id":null,"kind":"transition","from":"IDLE","to":"RUNNING","reason":"start"}
+{"ts":"2026-10-04T18:09:49.171Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-001","kind":"transition","from":"RUNNING","to":"WAITING_EVENT","reason":"dispatched CO-SIM-001 to worker"}
+{"ts":"2026-10-04T18:09:49.171Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-001","kind":"task_dispatched","starting_sha":"0000000000000000000000000000000000000000"}
+{"ts":"2026-10-04T18:09:49.178Z","actor":"control-plane","event_id":"evt-735e0eed93f0","task_id":"CO-SIM-001","kind":"transition","from":"WAITING_EVENT","to":"RUNNING","reason":"evidence verified at c4d3225358d14504faf37782a86024be269e3276"}
+{"ts":"2026-10-04T18:09:49.182Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-003","kind":"transition","from":"RUNNING","to":"WAITING_APPROVAL","reason":"action 'deploy' requires approval CO-SIM-003.deploy"}
+{"ts":"2026-10-04T18:09:49.182Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-003","kind":"approval_requested","approval_id":"CO-SIM-003.deploy"}
+{"ts":"2026-10-04T18:09:49.295Z","actor":"human:Asmundur","event_id":null,"task_id":"CO-SIM-003","kind":"approval_approved","approval_id":"CO-SIM-003.deploy"}
+{"ts":"2026-10-04T18:09:49.384Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-003","kind":"transition","from":"WAITING_APPROVAL","to":"RUNNING","reason":"approval CO-SIM-003.deploy granted by Asmundur"}
+{"ts":"2026-10-04T18:09:49.390Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-003","kind":"transition","from":"RUNNING","to":"WAITING_EVENT","reason":"dispatched CO-SIM-003 to worker"}
+{"ts":"2026-10-04T18:09:49.390Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-003","kind":"task_dispatched","starting_sha":"c4d3225358d14504faf37782a86024be269e3276"}
+{"ts":"2026-10-04T18:09:49.397Z","actor":"control-plane","event_id":"evt-097905cbf456","task_id":"CO-SIM-003","kind":"transition","from":"WAITING_EVENT","to":"RUNNING","reason":"evidence verified at 06d07d34b4e43d09ce0610b65b4ed239b5480324"}
+{"ts":"2026-10-04T18:09:49.400Z","actor":"control-plane","event_id":null,"task_id":null,"kind":"transition","from":"RUNNING","to":"COMPLETE","reason":"planner has no further tasks"}

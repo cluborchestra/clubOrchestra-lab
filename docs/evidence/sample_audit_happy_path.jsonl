@@ -1,0 +1,8 @@
+{"ts":"2026-10-04T18:12:15.252Z","actor":"human","event_id":null,"task_id":null,"kind":"transition","from":"IDLE","to":"RUNNING","reason":"start"}
+{"ts":"2026-10-04T18:12:15.257Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-001","kind":"transition","from":"RUNNING","to":"WAITING_EVENT","reason":"dispatched CO-SIM-001 to worker"}
+{"ts":"2026-10-04T18:12:15.257Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-001","kind":"task_dispatched","starting_sha":"0000000000000000000000000000000000000000"}
+{"ts":"2026-10-04T18:12:15.264Z","actor":"control-plane","event_id":"evt-735e0eed93f0","task_id":"CO-SIM-001","kind":"transition","from":"WAITING_EVENT","to":"RUNNING","reason":"evidence verified at c4d3225358d14504faf37782a86024be269e3276"}
+{"ts":"2026-10-04T18:12:15.267Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-002","kind":"transition","from":"RUNNING","to":"WAITING_EVENT","reason":"dispatched CO-SIM-002 to worker"}
+{"ts":"2026-10-04T18:12:15.268Z","actor":"control-plane","event_id":null,"task_id":"CO-SIM-002","kind":"task_dispatched","starting_sha":"c4d3225358d14504faf37782a86024be269e3276"}
+{"ts":"2026-10-04T18:12:15.272Z","actor":"control-plane","event_id":"evt-8a0b644700fa","task_id":"CO-SIM-002","kind":"transition","from":"WAITING_EVENT","to":"RUNNING","reason":"evidence verified at fcc30aa1403762094c654e0bfcbe00d0e6475de8"}
+{"ts":"2026-10-04T18:12:15.275Z","actor":"control-plane","event_id":null,"task_id":null,"kind":"transition","from":"RUNNING","to":"COMPLETE","reason":"planner has no further tasks"}

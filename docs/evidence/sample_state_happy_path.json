@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "version": 6,
+  "project_id": "clubOrchestra-lab",
+  "status": "COMPLETE",
+  "current_task_id": null,
+  "current_task": null,
+  "current_owner": null,
+  "lease_until": null,
+  "repo": "clubOrchestra-lab",
+  "branch": "main",
+  "expected_sha": null,
+  "last_verified_sha": "fcc30aa1403762094c654e0bfcbe00d0e6475de8",
+  "last_event_id": "evt-8a0b644700fa",
+  "failure_count": 0,
+  "next_safe_action": null,
+  "completed_tasks": [
+    "CO-SIM-001",
+    "CO-SIM-002"
+  ],
+  "inbox_cursor": 2
+}
