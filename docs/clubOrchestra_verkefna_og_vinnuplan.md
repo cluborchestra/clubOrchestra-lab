@@ -3,7 +3,7 @@ Status: ACTIVE
 Updated: 2026-10-05
 Owner: Product Owner (Ási) · umsjón: PM
 Canonical source: YES
-Version: v1.0
+Version: v1.1
 
 Ef skjölum ber ekki saman gildir eftirfarandi forgangsröð:
 1. nýjust staðfest evidence úr repo/keyrslu;
@@ -176,6 +176,7 @@ Staðfest 2026-10-05 úr git og opinberu GitHub API.
   [evidence/CO-P3-LOT2B-001.md](../evidence/CO-P3-LOT2B-001.md).
 
 ## 9. NEXT
+0. **PRE3** (verndaðar skrár, `/approve` í issue, fest CLI-útgáfa): bíður verklýsingar frá PM. Hún hefur ekki borist, svo verkið er ekki hafið.
 1. PR fyrir `docs/co-p2b-e2e-status`, og síðan fyrir Lot-greinina (Lot 1 → 2 → 2b, staflað) inn í
    `main` (merge commit).
 2. Lot 3 þegar Ási samþykkir (§13, §14).
@@ -231,9 +232,6 @@ hvorki `process.env`, `fetch(` né `child_process` (offline-próf).
    5. samþykki fyrir einni undanþeginni skrá, `src/agents/live.js`.
 2. **Merge:** PR fyrir docs-greinina og fyrir Lot-greinina inn í `main`.
 3. **B5:** hvenær á að endurkeyra live tvítekningarprófið.
-4. **Spec v0.1** (`clubOrchestra_verkefna_og_vinnuplan_v0.1.md` í rót) segist enn vera canonical,
-   og stangast þar á við þetta skjal (staðall §13). Á að merkja hana *superseded*, eða setja hana í
-   skjalasafn? Ég breytti henni ekki, því hún er í eigu Ása.
 
 ## 14. Roadmap / work packages
 P0 hönnun ✔ → P1 ✔ → P2a ✔ → P2b ✔ (VERIFIED LIVE með hermdum workers) → P3 Lot 1 ✔ → Lot 2 ✔ →
@@ -283,11 +281,13 @@ Nánar í [SECURITY_MODEL.md](../SECURITY_MODEL.md). Helstu atriði:
   - Yfirlit yfir skjöl: [DOCUMENTATION_INVENTORY.md](DOCUMENTATION_INVENTORY.md).
 - **Tungumál og útgáfur:** íslenska í skjölum, enska í kóða. Engin útgáfa í skráarheitum, heldur
   í haus og breytingaskrá.
-- **Evidence** fer í `evidence/<verk-id>.md`. Ási fær einn hlekk.
+- **Evidence** fer í `evidence/<verk-id>.md`. PM/Ási fá **einn permalink með commit-SHA**
+  (`…/blob/<SHA>/evidence/…`), aldrei hlekk á greinarheiti, því vefsækir les annars úrelt afrit.
 - **Hvert verk:** feat-grein og PR. Kóði og skjöl segja sömu sögu í sama commit.
 
 ## 18. Breytingaskrá
 | Útgáfa | Dags. | Breyting |
 |---|---|---|
 | v0.1 | 2026-10-04 | Upprunalegt spec í rót (`clubOrchestra_verkefna_og_vinnuplan_v0.1.md`): hönnun + backlog. Sögulegt. |
+| v1.1 | 2026-10-05 | Spec v0.1 merkt SUPERSEDED (ákvörðun Ása), og sú ákvörðun tekin af §13. PRE3 skráð í §9 sem bíðandi verklýsingu. Hlekkir til PM eru héðan í frá permalinks með commit-SHA (§17). |
 | v1.0 | 2026-10-05 | Club-skjölunarstaðall tekinn upp. Þetta skjal varð canonical plan. Inn í það voru sameinuð drögin `clubOrchestra_samantekt_/virknilysing_/verkefna_og_vinnuplan_v1.0` og `CURRENT_STATUS.md`, sem var eytt. Tilgangur og escalation-regla orðrétt í §1 og §4. Staða til og með P3 Lot 2b. |

@@ -41,6 +41,20 @@ DOCUMENTATION_INVENTORY).
 **Lagað samhliða:** sim-strengurinn `documentation_requirements` vísaði í `CURRENT_STATUS`. Hann
 vísar nú í `docs/PROJECT_STATUS.json`, og fixtures voru endurgerð. Prófin eru enn 120/120.
 
+## Umferð 3 (2026-10-05): spec v0.1, permalinks og PRE3
+- **Spec v0.1 merkt SUPERSEDED.** Hausinn fær `Status: SUPERSEDED`,
+  `Superseded by: docs/clubOrchestra_verkefna_og_vinnuplan.md` og `Updated: 2026-10-05`.
+  - **Aðeins þremur línum var bætt við.** Meginmálið er bæti-fyrir-bæti óbreytt: sha256 af gömlu
+    skránni og af nýju skránni án nýju línanna er í báðum tilvikum `5db8be7f91e6ce04…`.
+  - Skránni var ekki eytt. Hún er skráð í
+    [DOCUMENTATION_INVENTORY](../docs/DOCUMENTATION_INVENTORY.md#söguleg-skjöl).
+  - Aðalskjalið fer í v1.1: ákvörðuninni er lokið, og hún er skráð í breytingaskrá.
+- **Hlekkir til PM:** héðan í frá alltaf permalink með commit-SHA. Reglan er skráð í aðalskjal §17
+  og í PM_HANDOFF.
+- **PRE3:** verklýsing hefur **ekki** borist mér, og ég hef ekki byrjað á því. Ég bý hana ekki til út
+  frá stikkorðunum, því `/approve` í issue er samþykktarleið og þar með öryggismál. Skráð sem
+  bíðandi í aðalskjal §9 og PM_HANDOFF. Bíður verklýsingar.
+
 ## Verk 2: escalation-reglan í kóða
 Hver dispatch-ákvörðun er **AUTO** eða **OWNER** (`src/escalation.js`).
 

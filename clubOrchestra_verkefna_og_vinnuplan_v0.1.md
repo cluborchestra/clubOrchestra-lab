@@ -1,4 +1,7 @@
 # clubOrchestra — verkefna- og vinnuplan
+Status: SUPERSEDED
+Superseded by: docs/clubOrchestra_verkefna_og_vinnuplan.md
+Updated: 2026-10-05
 
 **Útgáfa:** v0.1 · **Dagsetning:** 2026-10-04 · **Vinnuheiti:** clubOrchestra
 **Hlutverk skjals:** canonical source of truth fyrir verkefnið (hönnun + lifandi backlog).

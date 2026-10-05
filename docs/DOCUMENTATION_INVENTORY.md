@@ -43,7 +43,7 @@ frá og með Lot 2b. Sameining er ákvörðun Ása/PM; ekkert hefur verið flutt
 ## Söguleg skjöl
 | Skjal | Staða | Athugasemd |
 |---|---|---|
-| [clubOrchestra_verkefna_og_vinnuplan_v0.1.md](../clubOrchestra_verkefna_og_vinnuplan_v0.1.md) (rót) | HISTORICAL. Leyst af hólmi af aðalskjalinu v1.0 | Í eigu Ása, óbreytt. Í hausnum segist hún enn vera canonical, sem stangast á við staðal §13. **Ákvörðun Ása:** merkja hana *superseded* eða setja í skjalasafn. |
+| [clubOrchestra_verkefna_og_vinnuplan_v0.1.md](../clubOrchestra_verkefna_og_vinnuplan_v0.1.md) (rót) | **SUPERSEDED** (2026-10-05, ákvörðun Ása). Leyst af hólmi af `docs/clubOrchestra_verkefna_og_vinnuplan.md` | Hausinn hefur `Status: SUPERSEDED · Superseded by: … · Updated: 2026-10-05`. Innihaldi var ekki breytt og skránni ekki eytt; meginmálið er bæti-fyrir-bæti óbreytt. Línan „canonical source of truth“ í gamla hausnum gildir ekki lengur, því `Status: SUPERSEDED` ræður. |
 
 ## Fjarlægt 2026-10-05 (staðall §2 og §13)
 | Skjal | Hvert efnið fór |
