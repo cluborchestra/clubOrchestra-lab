@@ -32,7 +32,7 @@
         "content": [
           {
             "type": "output_text",
-            "text": "{\"task\":{\"task_id\":\"CO-SIM-001\",\"action\":\"implement\",\"objective\":\"Add greeting module\",\"repo\":\"cluborchestra/clubOrchestra-lab\",\"branch_policy\":\"feature branch -> PR; no direct main commits\",\"starting_sha\":\"0000000000000000000000000000000000000000\",\"allowed_scope\":[\"sim workspace\"],\"forbidden_scope\":[\"network\",\"secrets\",\"other repos\"],\"acceptance_criteria\":[\"Add greeting module is done\"],\"required_tests\":[\"unit\"],\"security_boundaries\":[\"offline\",\"no secrets\"],\"documentation_requirements\":[\"CURRENT_STATUS updated\"],\"evidence_required\":[\"test output\",\"ending_sha\"],\"return_format\":\"from-worker v1\",\"requires_approval\":false},\"decision\":{\"class\":\"AUTO\",\"category\":null,\"reason\":\"x\"}}",
+            "text": "{\"task\":{\"task_id\":\"CO-SIM-001\",\"action\":\"implement\",\"objective\":\"Add greeting module\",\"repo\":\"cluborchestra/clubOrchestra-lab\",\"branch_policy\":\"feature branch -> PR; no direct main commits\",\"starting_sha\":\"0000000000000000000000000000000000000000\",\"allowed_scope\":[\"sim workspace\"],\"forbidden_scope\":[\"network\",\"secrets\",\"other repos\"],\"acceptance_criteria\":[\"Add greeting module is done\"],\"required_tests\":[\"unit\"],\"security_boundaries\":[\"offline\",\"no secrets\"],\"documentation_requirements\":[\"docs/PROJECT_STATUS.json updated\"],\"evidence_required\":[\"test output\",\"ending_sha\"],\"return_format\":\"from-worker v1\",\"requires_approval\":false},\"decision\":{\"class\":\"AUTO\",\"category\":null,\"reason\":\"x\"}}",
             "annotations": [],
             "logprobs": []
           }

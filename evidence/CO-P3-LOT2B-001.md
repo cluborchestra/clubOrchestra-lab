@@ -1,24 +1,45 @@
 # Evidence — CO-P3-LOT2B-001
 
-**Dagsetning:** 2026-10-05 · **Grein:** `feat/co-p3-lot2b-async` · **Kóði:** `83e3762` (async + fánar) og `d0acf8f` (escalation + skjöl)
-**Niðurstaða:** öll þrjú verkin eru búin. Prófasvítan er **120/120 græn**, offline. Ekkert módelkall,
-enginn lykill, enginn kostnaður. Ekkert á `co/`, ekkert í `main`.
-Skráin inniheldur engin leyndarmál (repo-ið er opið).
+**Dagsetning:** 2026-10-05 · **Grein:** `feat/co-p3-lot2b-async`
+**Kóði:** `83e3762` (async + fánar) og `d0acf8f` (escalation). Skjöl skv. club-staðli: sjá commit-ið
+sem bætir þessum kafla við.
+**Niðurstaða:** öll þrjú verkin eru búin. Skjölun fylgir nú club-skjölunarstaðlinum. Prófasvítan er
+**120/120 græn**, offline. Ekkert módelkall, enginn lykill, enginn kostnaður. Ekkert á `co/`, ekkert
+í `main`. Skráin inniheldur engin leyndarmál (repo-ið er opið).
 
 ## Tilgangur
-Skráður orðrétt í [docs/clubOrchestra_samantekt_verkefnis_v1.0.md](../docs/clubOrchestra_samantekt_verkefnis_v1.0.md) §1.
-Til Ása fer eingöngu: kostnaður, umfang, aðgangur eða verk Ása, óafturkræft og öryggi/lyklar,
-**og allur vafi**. Allt annað er sjálfvirkt.
+Skráður orðrétt í [aðalskjalinu §1](../docs/clubOrchestra_verkefna_og_vinnuplan.md#1-kjarni--tilgangur),
+og escalation-reglan orðrétt í §4. Til Ása fer eingöngu: kostnaður, umfang, aðgangur eða verk Ása,
+óafturkræft og öryggi/lyklar, **og allur vafi**. Allt annað er sjálfvirkt.
 
-## Verk 1: skjölun (íslenska, `docs/`)
-| Skjal | Innihald |
+## Verk 1: skjölun eftir club-staðlinum (leiðrétt útgáfa)
+Upphafssett staðalsins (§15) í `docs/`, á íslensku (§10), án tómra skjala:
+| Skjal | Hlutverk |
 |---|---|
-| [clubOrchestra_samantekt_verkefnis_v1.0.md](../docs/clubOrchestra_samantekt_verkefnis_v1.0.md) | Tilgangur orðréttur, staða allra áfanga, lykilákvarðanir |
-| [clubOrchestra_virknilysing_verkefnis_v1.0.md](../docs/clubOrchestra_virknilysing_verkefnis_v1.0.md) | Review-Dispatch Loop (áfangi P4), ástandsvél, escalation-reglan, kostnaðarvarnir, fail-closed |
-| [clubOrchestra_verkefna_og_vinnuplan_v1.0.md](../docs/clubOrchestra_verkefna_og_vinnuplan_v1.0.md) | LOT 2b (lokið) → LOT 3 (röð og skyldur) → backlog |
+| [clubOrchestra_verkefna_og_vinnuplan.md](../docs/clubOrchestra_verkefna_og_vinnuplan.md) | **Aðalskjal, Canonical source: YES, v1.0.** Kaflar 1–18 skv. staðli §5. Tilgangur orðréttur í §1, escalation-regla orðrétt í §4, breytingaskrá í §18. |
+| [PROJECT_STATUS.json](../docs/PROJECT_STATUS.json) | Eingöngu staðfest staða. `merged`, `deployed`, `verified_live` og `accepted` eru aðskilin, og skipting í main/greinar er skráð. |
+| [PM_HANDOFF.md](../docs/PM_HANDOFF.md) | Stutt afleiða; nefnir canonical heimildir sínar. |
+| [DOCUMENTATION_INVENTORY.md](../docs/DOCUMENTATION_INVENTORY.md) | Öll skjöl, staða þeirra, forgangsröð heimilda, og það sem var fjarlægt og hvert efnið fór. |
+| [CLUB_DOCUMENTATION_STANDARD.md](../docs/CLUB_DOCUMENTATION_STANDARD.md) | Staðallinn orðréttur. Haus: REFERENCE, Canonical source: YES fyrir skjölunarreglur. |
 
-README og CURRENT_STATUS nota heitið **„Review-Dispatch Loop (áfangi P4)“** og vísa í tilganginn.
-Spec v0.1 er óbreytt.
+**Val um `CURRENT_STATUS.md`: sameinað og EYTT** (staðall §13, að fyrirmælum PO). Engin
+tilvísunarskrá er skilin eftir.
+- Staða og capability fóru í `PROJECT_STATUS.json` og aðalskjal §6, §7 og §12.
+- Opin vinna, hlið og ákvarðanir fóru í `PM_HANDOFF.md` og aðalskjal §13.
+- Þekktar takmarkanir fóru í aðalskjal §12 og §16.
+
+**Fjarlægt einnig:** `docs/clubOrchestra_samantekt_/virknilysing_/verkefna_og_vinnuplan_v1.0.md`.
+Staðall §2 bannar útgáfu í skráarheiti, og efnið er sameinað í aðalskjalið (sjá
+DOCUMENTATION_INVENTORY).
+
+**Óbreytt:**
+- `SECURITY_MODEL.md`: sérhæft skjal, skráð í yfirlitinu.
+- `README.md`: tæknilegt, á ensku, og vísar nú á nýja settið.
+- Spec v0.1 í rót: í eigu Ása, óbreytt. Í aðalskjali §13 er spurt hvort eigi að merkja hana
+  *superseded*, því hún segist enn vera canonical.
+
+**Lagað samhliða:** sim-strengurinn `documentation_requirements` vísaði í `CURRENT_STATUS`. Hann
+vísar nú í `docs/PROJECT_STATUS.json`, og fixtures voru endurgerð. Prófin eru enn 120/120.
 
 ## Verk 2: escalation-reglan í kóða
 Hver dispatch-ákvörðun er **AUTO** eða **OWNER** (`src/escalation.js`).
@@ -118,4 +139,4 @@ Nettilgildra er virk í hverju prófaferli. Í `src/` er hvorki `process.env`, `
 Samþykki og spend-cap · **provider-budget (SKYLDA)** · tveir lyklar í environments
 `agents-planner` / `agents-worker` (aðeins `main`, Ási required reviewer) · verð planner-módels ·
 samþykki fyrir einni undanþeginni skrá `src/agents/live.js`. Sjá
-[vinnuplan v1.0 §2](../docs/clubOrchestra_verkefna_og_vinnuplan_v1.0.md).
+[aðalskjal §13](../docs/clubOrchestra_verkefna_og_vinnuplan.md#13-ákvarðanir-sem-product-owner-þarf-að-taka).

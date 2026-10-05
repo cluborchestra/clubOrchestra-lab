@@ -54,7 +54,7 @@ class SimPlanner extends PlannerAdapter {
       acceptance_criteria: [`${step.objective} is done`],
       required_tests: ['unit'],
       security_boundaries: ['offline', 'no secrets'],
-      documentation_requirements: ['CURRENT_STATUS updated'],
+      documentation_requirements: ['docs/PROJECT_STATUS.json updated'],
       evidence_required: ['test output', 'ending_sha'],
       return_format: 'from-worker v1',
       ...this.extra,

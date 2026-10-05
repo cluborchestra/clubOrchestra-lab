@@ -1,7 +1,7 @@
 # clubOrchestra-lab
 
 **Purpose (verbatim, Icelandic; it overrides everything else):** see
-[docs/clubOrchestra_samantekt_verkefnis_v1.0.md](docs/clubOrchestra_samantekt_verkefnis_v1.0.md) §1.
+[docs/clubOrchestra_verkefna_og_vinnuplan.md](docs/clubOrchestra_verkefna_og_vinnuplan.md) §1.
 In short, two AIs from two vendors (OpenAI planner + Claude worker) check each other's work, and
 everything the owner does not need to answer is handled automatically. Only the following go to
 the owner (Ási):
@@ -11,9 +11,11 @@ the owner (Ási):
 - irreversible or security/key matters;
 - **anything uncertain** (fail closed).
 
-Project documents (Icelandic): [summary](docs/clubOrchestra_samantekt_verkefnis_v1.0.md) ·
-[functional description](docs/clubOrchestra_virknilysing_verkefnis_v1.0.md) ·
-[work plan](docs/clubOrchestra_verkefna_og_vinnuplan_v1.0.md).
+Project documents (Icelandic, per [docs/CLUB_DOCUMENTATION_STANDARD.md](docs/CLUB_DOCUMENTATION_STANDARD.md)):
+- [canonical plan](docs/clubOrchestra_verkefna_og_vinnuplan.md) (source of truth);
+- [PROJECT_STATUS.json](docs/PROJECT_STATUS.json) (verified current state);
+- [PM_HANDOFF.md](docs/PM_HANDOFF.md);
+- [DOCUMENTATION_INVENTORY.md](docs/DOCUMENTATION_INVENTORY.md).
 
 clubOrchestra control plane with simulated workers.
 
@@ -24,7 +26,7 @@ clubOrchestra control plane with simulated workers.
   reconciles after a restart.
 - **P2b:** wired to GitHub: https://github.com/cluborchestra/clubOrchestra-lab (public). State
   lives on the orphan branch `orchestra-state`. The orchestrator workflow is **disabled** until
-  the Product Owner enables it. First live run done: see CURRENT_STATUS.
+  the Product Owner enables it. First live run done: see `docs/PROJECT_STATUS.json`.
 - **P3 Lot 1:** agent-adapter boundary + spend/rate safety controls, with **mock** model agents.
   No real API, no keys, no cost. Secrets plan: [SECURITY_MODEL.md](SECURITY_MODEL.md).
 - **P3 Lot 2:** replay dry run with the **real API shapes**: OpenAI Responses (planner) and Claude
@@ -36,8 +38,8 @@ The core loop (CI → orchestrator → planner review → dispatch of the next t
 "continue") is called the **Review-Dispatch Loop (P4 milestone; Icelandic: áfangi P4)**. Its mechanism is verified on real
 GitHub with simulated workers. P4 acceptance with real agents waits for P3 Lot 3.
 
-Canonical spec: [clubOrchestra_verkefna_og_vinnuplan_v0.1.md](clubOrchestra_verkefna_og_vinnuplan_v0.1.md).
-Status per feature: [CURRENT_STATUS.md](CURRENT_STATUS.md).
+Original spec (historical, v0.1): [clubOrchestra_verkefna_og_vinnuplan_v0.1.md](clubOrchestra_verkefna_og_vinnuplan_v0.1.md).
+Current status per capability: [docs/PROJECT_STATUS.json](docs/PROJECT_STATUS.json) and the canonical plan §6–§7, §12.
 
 **Fully offline and free:** Node.js ≥ 22, zero *production* dependencies, no network,
 no secrets, no API keys. Planner and worker are deterministic stubs. The P2a tests and harness

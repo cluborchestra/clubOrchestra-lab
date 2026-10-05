@@ -1,0 +1,83 @@
+{
+  "status_schema_version": 1,
+  "updated_at": "2026-10-05",
+  "project": "clubOrchestra",
+  "canonical_plan": "docs/clubOrchestra_verkefna_og_vinnuplan.md",
+  "repository": "https://github.com/cluborchestra/clubOrchestra-lab",
+  "production": {
+    "runtime": "GitHub Actions (CI + Orchestrator workflows on main)",
+    "main_sha": "1597f1b55ebb77f5e2f72be4928f565d52320952",
+    "main_protected": true,
+    "orchestrator_enabled": true,
+    "orchestrator_enabled_source": "repository variable ORCHESTRATOR_ENABLED=true, set by Product Owner 2026-10-05",
+    "state_branch": "orchestra-state",
+    "state_sha": "66cee561d3821a758af332aa11af2b26e1be19db",
+    "loop_state": {
+      "status": "WAITING_EVENT",
+      "awaiting": "worker",
+      "current_task_id": "CO-SIM-002",
+      "completed_tasks": ["CO-SIM-001"],
+      "note": "accepted stopping point; nothing executes CO-SIM-002"
+    },
+    "agents": "simulated only; no API keys exist; no live transport in code",
+    "spend_to_date_usd": 0
+  },
+  "current_work_package": "CO-P3-LOT2B-001",
+  "capability_matrix": {
+    "control_plane_p1": { "state": "LIVE", "merged": true, "accepted": true, "evidence": "test/control-plane.test.js; QA 2026-10-04" },
+    "github_wiring_p2b": { "state": "LIVE", "merged": true, "accepted": true, "evidence": "main 1597f1b" },
+    "review_dispatch_loop_simulated_workers": {
+      "state": "VERIFIED_LIVE", "merged": true, "accepted": true,
+      "evidence": "docs/evidence/p2b_live_run.md; CI 37357864409 -> orchestrator 37357891383 (stale no-op); CI 37358003409 -> orchestrator 37358037144 attempt 1 (complete)"
+    },
+    "duplicate_event_noop_live": { "state": "VERIFIED_DRY_RUN", "live": "DEFERRED", "reason": "GitHub hosted-runner incident; run 37358037144 attempts 2-3 never started" },
+    "agent_adapters_spend_controls_lot1": { "state": "READY_NOT_DEPLOYED", "merged": false, "accepted": true, "branch": "feat/co-p3-lot2b-async", "commit": "69b29df" },
+    "replay_real_api_shapes_lot2": { "state": "READY_NOT_DEPLOYED", "merged": false, "accepted": true, "branch": "feat/co-p3-lot2b-async", "commit": "1dee952" },
+    "async_call_path_and_verified_worker_flags_lot2b": { "state": "READY_NOT_DEPLOYED", "merged": false, "accepted": false, "branch": "feat/co-p3-lot2b-async", "commit": "83e3762", "claude_code_version_checked": "2.1.286 (--version/--help only)" },
+    "escalation_rule_auto_owner": { "state": "READY_NOT_DEPLOYED", "merged": false, "accepted": false, "branch": "feat/co-p3-lot2b-async", "commit": "d0acf8f", "live_issue_step_run": false },
+    "real_agents": { "state": "PLANNED", "gate": "Product Owner approval + spend cap (Lot 3)" },
+    "p4_acceptance_real_agents": { "state": "PLANNED" },
+    "owner_notifications_blocked_and_80_percent": { "state": "PLANNED", "backlog": "B1" },
+    "failure_tests_p5": { "state": "FUTURE" }
+  },
+  "tests": {
+    "local": { "total": 120, "passed": 120, "failed": 0, "commit": "d0acf8f", "network_trap": true },
+    "github_ci": { "last_run": 37355805656, "event": "pull_request", "branch": "feat/co-p2b-001-github-wiring", "conclusion": "success", "note": "no CI has run on the P3 branches (no PR yet)" }
+  },
+  "branches_pending_merge": [
+    { "branch": "docs/co-p2b-e2e-status", "head": "2c363ae", "pr": "not verified" },
+    { "branch": "feat/co-p3-lot2b-async", "contains": ["2c363ae", "69b29df", "1dee952", "83e3762", "d0acf8f"], "pr": "not opened" }
+  ],
+  "priorities": [
+    "PM/QA review of CO-P3-LOT2B-001",
+    "Merge docs branch, then the stacked P3 branch, into main (merge commit)",
+    "Lot 3 only after Product Owner approval"
+  ],
+  "next_steps": [
+    { "id": "merge", "owner": "Product Owner", "action": "open/merge PRs for docs/co-p2b-e2e-status and feat/co-p3-lot2b-async" },
+    { "id": "lot3", "owner": "Product Owner", "action": "approve Lot 3: spend cap, provider budgets (mandatory), keys in environments agents-planner/agents-worker, planner model price, exemption for src/agents/live.js" },
+    { "id": "B5", "owner": "Product Owner", "action": "re-run orchestrator run 37358037144 when GitHub Actions runners are healthy" }
+  ],
+  "blockers": [
+    { "id": "B5", "summary": "live duplicate-delivery test waits for healthy GitHub hosted runners", "since": "2026-10-05", "rechecked": false }
+  ],
+  "gates": [
+    { "gate": "lot3_real_agents", "type": "cost", "required": "Product Owner approval + spend cap + provider budgets" },
+    { "gate": "merge_to_main", "type": "release", "required": "PR into protected main (no bypass)" },
+    { "gate": "co_branch_push", "type": "runtime", "required": "explicit approval per run (orchestrator is armed)" }
+  ],
+  "roadmap": {
+    "done": ["P0", "P1", "P2a", "P2b", "P3-Lot1", "P3-Lot2"],
+    "in_review": ["P3-Lot2b"],
+    "next": ["P3-Lot3"],
+    "later": ["P4-acceptance", "P5"],
+    "backlog": ["B1", "B2", "B3", "B4", "B5", "B6", "B7"]
+  },
+  "operating_model": {
+    "escalation_rule": "AUTO or OWNER per dispatch decision; policy floor in code; unclassifiable -> OWNER; OWNER -> GitHub Issue assigned to cluborchestra + loop waits",
+    "owner_channel": "GitHub Issues assigned to cluborchestra (email via GitHub to the account owner)",
+    "approval_mechanism": "data/approvals/<id>.json on orchestra-state (issue-based approval is backlog B3)",
+    "branch_policy": "feature branch + PR; main protected; no co/ push without per-run approval",
+    "spend_controls": "SpendGuard reservation before every call, UTC daily cap, default mode mock with 0 USD caps"
+  }
+}
