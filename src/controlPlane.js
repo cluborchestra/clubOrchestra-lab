@@ -7,6 +7,8 @@ const { validateEvent, verifyEvidence, isPlainObject } = require('./events');
 const { HANDOFF_REQUIRED } = require('./handoff');
 const { assertPlannerAdapter, assertWorkerAdapter } = require('./agents/adapter');
 const { AgentHaltError } = require('./agents/errors');
+const { decide } = require('./escalation');
+const { OwnerIssueOutbox } = require('./ownerIssues');
 const ID_RE = /^[A-Za-z0-9._-]{1,100}$/;
 const NEEDS_HUMAN = 'NEEDS_HUMAN';
 
@@ -26,7 +28,7 @@ function approvalIdFor(handoff) {
 // ci.completed event for that exact sha passes, the branch head (read from `repo`) still equals
 // that sha, and the planner's review accepts it.
 class ControlPlane {
-  constructor({ dir, planner, worker, actor = 'control-plane', breakerThreshold = POLICY.breaker_threshold, now = () => new Date().toISOString(), leaseMs, requireCi = false, repo = null } = {}) {
+  constructor({ dir, planner, worker, actor = 'control-plane', breakerThreshold = POLICY.breaker_threshold, now = () => new Date().toISOString(), leaseMs, requireCi = false, repo = null, notifier = null } = {}) {
     if (!dir) throw new Error('dir is required');
     this.store = new Store(dir, { leaseMs });
     this.planner = assertPlannerAdapter(planner);
@@ -36,6 +38,7 @@ class ControlPlane {
     this.now = now;
     this.requireCi = requireCi;
     this.repo = repo;
+    this.notifier = notifier || new OwnerIssueOutbox(dir);
   }
 
   init(opts) {
@@ -222,34 +225,52 @@ class ControlPlane {
       return;
     }
 
-    // Approval requirement comes from POLICY by action, never from the handoff's own fields.
-    if (POLICY.approval_required_actions.includes(handoff.action)) {
+    // Escalation rule: AUTO or OWNER. The policy floor (by action, in code) can only be raised by the
+    // planner, never lowered; an unclassifiable decision is OWNER (fail closed).
+    const decision = decide(handoff, await this._plannerClassification(handoff));
+    note({ kind: 'decision', task_id: handoff.task_id, actor: decision.decided_by === 'planner' ? 'planner' : this.actor, decision: decision.class, category: decision.category, decided_by: decision.decided_by, reason: decision.reason });
+    if (decision.class === 'OWNER') {
       const id = approvalIdFor(handoff);
       const approval = this.store.readApproval(id);
-      const decision = this._approvalDecision(approval, handoff);
-      if (decision === 'denied') {
+      const answer = this._approvalDecision(approval, handoff);
+      if (answer === 'denied') {
         s.next_safe_action = `${NEEDS_HUMAN}: approval ${id} denied`;
         tx('BLOCKED', { task_id: handoff.task_id, reason: `approval ${id} denied` });
         return;
       }
-      if (decision !== 'approved') {
-        Object.assign(s, { current_task_id: handoff.task_id, current_task: handoff, current_owner: 'human', next_safe_action: `await approval ${id}` });
-        tx('WAITING_APPROVAL', { task_id: handoff.task_id, reason: `action '${handoff.action}' requires approval ${id}` });
+      if (answer !== 'approved') {
+        Object.assign(s, { current_task_id: handoff.task_id, current_task: handoff, current_owner: 'human', next_safe_action: `await owner decision ${id} (${decision.category})` });
+        tx('WAITING_APPROVAL', { task_id: handoff.task_id, reason: `OWNER/${decision.category} (${decision.decided_by}): approval ${id} required` });
         if (!approval) {
           const record = {
             approval_id: id, task_id: handoff.task_id, action: handoff.action,
-            reason: `Policy requires approval for action '${handoff.action}'`,
+            category: decision.category, decided_by: decision.decided_by,
+            reason: decision.reason || `Policy requires approval for action '${handoff.action}'`,
             requested_at: this.now(), requested_by: 'planner',
             status: 'pending', approved_by: null, approved_at: null,
           };
-          ctx.afterCommit.push(() => this.store.writeApproval(record));
-          note({ kind: 'approval_requested', approval_id: id, task_id: handoff.task_id, actor: this.actor });
+          ctx.afterCommit.push(() => {
+            this.store.writeApproval(record);
+            this.notifier.ownerDecision(record); // GitHub Issue request, assigned to the owner
+          });
+          note({ kind: 'approval_requested', approval_id: id, task_id: handoff.task_id, actor: this.actor, category: decision.category });
         }
         return;
       }
     }
 
     this._dispatch(s, tx, ctx, note, handoff);
+  }
+
+  // The planner's AUTO/OWNER classification for this handoff, or null if it cannot give one.
+  async _plannerClassification(handoff) {
+    if (typeof this.planner.classify !== 'function') return null;
+    try {
+      return await this.planner.classify(clone(handoff));
+    } catch (err) {
+      if (err instanceof AgentHaltError) throw err;
+      return null; // unclassifiable -> OWNER (fail closed)
+    }
   }
 
   _checkHandoff(h, s) {

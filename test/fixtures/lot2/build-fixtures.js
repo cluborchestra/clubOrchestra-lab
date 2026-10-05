@@ -46,18 +46,23 @@ const ok = (what, body) => ({ _fixture: oaHeader(what), status: 200, headers: { 
 const err = (what, status, headers, error) => ({ _fixture: oaHeader(what), status, headers: { 'content-type': 'application/json', ...headers }, body: { error } });
 
 const sim = new SimPlanner({ repo: REPO });
-const plan = (completed, last) => JSON.stringify({ task: sim.nextTask({ completed_tasks: completed, last_verified_sha: last }) });
+const plan = (completed, last, decision) => {
+  const task = sim.nextTask({ completed_tasks: completed, last_verified_sha: last });
+  return JSON.stringify({ task, decision: decision || (task ? sim.classify(task) : null) });
+};
 
 const openai = {
   'plan-0-task1': ok('plan#0 -> CO-SIM-001 handoff', responseBody({ id: 'plan0', text: plan([], SHA.base) })),
   'plan-1-task2': ok('plan#1 -> CO-SIM-002 handoff (starts at a1…)', responseBody({ id: 'plan1', text: plan(['CO-SIM-001'], SHA.a1) })),
-  'plan-done': ok('plan -> no more tasks', responseBody({ id: 'plandone', text: JSON.stringify({ task: null }), usage: { input: 1500, output: 12 } })),
+  'plan-done': ok('plan -> no more tasks', responseBody({ id: 'plandone', text: JSON.stringify({ task: null, decision: null }), usage: { input: 1500, output: 12 } })),
+  'plan-0-owner-scope': ok('plan#0 -> CO-SIM-001, classified OWNER/scope by the planner', responseBody({ id: 'planowner', text: plan([], SHA.base, { class: 'OWNER', category: 'scope', reason: 'adds a new feature beyond the agreed goal' }) })),
+  'plan-0-unclassified': ok('plan#0 -> CO-SIM-001 with an unusable decision (class MAYBE)', responseBody({ id: 'planmaybe', text: plan([], SHA.base, { class: 'MAYBE', category: null, reason: 'not sure' }) })),
   'review-accept': ok('review -> ACCEPT', responseBody({ id: 'revacc', text: JSON.stringify({ verdict: 'ACCEPT', reason: 'CI green on the exact sha; scope respected' }), usage: { input: 900, output: 40 }, schema: 'co_review' })),
   'review-reject': ok('review -> REJECT', responseBody({ id: 'revrej', text: JSON.stringify({ verdict: 'REJECT', reason: 'docs not updated for the new module' }), usage: { input: 900, output: 40 }, schema: 'co_review' })),
   refusal: ok('refusal content part', responseBody({ id: 'refusal', refusal: "I can't help with that request." , usage: { input: 1500, output: 9 } })),
   'incomplete-max-output-tokens': ok('status incomplete, reason max_output_tokens (truncated JSON)', responseBody({ id: 'trunc', status: 'incomplete', incomplete: { reason: 'max_output_tokens' }, text: '{"task": {"task_id": "CO-SIM-001", "action": "impl', usage: { input: 1500, output: 2000 } })),
   'malformed-json': ok('output_text is prose, not JSON', responseBody({ id: 'prose', text: 'Sure! Here is the plan: {"task": ...}', usage: { input: 1500, output: 20 } })),
-  'schema-violation': ok('task missing "why", with an extra field', responseBody({ id: 'schema', text: (() => { const t = JSON.parse(plan([], SHA.base)).task; delete t.why; return JSON.stringify({ task: { ...t, requires_approval: false } }); })() })),
+  'schema-violation': ok('task missing "why", with an extra field', responseBody({ id: 'schema', text: (() => { const t = JSON.parse(plan([], SHA.base)).task; delete t.why; return JSON.stringify({ task: { ...t, requires_approval: false }, decision: { class: 'AUTO', category: null, reason: 'x' } }); })() })),
   'error-429-retry-after-2': err('429 rate limit, retry-after 2s', 429, { 'retry-after': '2' }, { message: 'Rate limit reached for requests', type: 'requests', param: null, code: 'rate_limit_exceeded' }),
   'error-429-retry-after-3600': err('429 rate limit, retry-after 3600s (beyond our cap)', 429, { 'retry-after': '3600' }, { message: 'Rate limit reached for requests', type: 'requests', param: null, code: 'rate_limit_exceeded' }),
   'error-500': err('500 server error', 500, {}, { message: 'The server had an error while processing your request.', type: 'server_error', param: null, code: null }),

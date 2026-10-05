@@ -16,10 +16,22 @@ const HANDOFF_SCHEMA = Object.freeze({
   additionalProperties: false,
 });
 
+// Escalation rule: every planned task carries an AUTO/OWNER classification (src/escalation.js).
+const DECISION_SCHEMA = Object.freeze({
+  type: 'object',
+  properties: {
+    class: { type: 'string', enum: ['AUTO', 'OWNER'] },
+    category: { anyOf: [{ type: 'string', enum: ['cost', 'scope', 'access', 'irreversible', 'security', 'uncertain'] }, { type: 'null' }] },
+    reason: { type: 'string' },
+  },
+  required: ['class', 'category', 'reason'],
+  additionalProperties: false,
+});
+
 const PLAN_SCHEMA = Object.freeze({
   type: 'object',
-  properties: { task: { anyOf: [HANDOFF_SCHEMA, { type: 'null' }] } },
-  required: ['task'],
+  properties: { task: { anyOf: [HANDOFF_SCHEMA, { type: 'null' }] }, decision: { anyOf: [DECISION_SCHEMA, { type: 'null' }] } },
+  required: ['task', 'decision'],
   additionalProperties: false,
 });
 
@@ -32,4 +44,4 @@ const REVIEW_SCHEMA = Object.freeze({
 
 const SCHEMA_BY_PURPOSE = Object.freeze({ plan: ['co_plan', PLAN_SCHEMA], review: ['co_review', REVIEW_SCHEMA] });
 
-module.exports = { HANDOFF_SCHEMA, PLAN_SCHEMA, REVIEW_SCHEMA, SCHEMA_BY_PURPOSE };
+module.exports = { HANDOFF_SCHEMA, DECISION_SCHEMA, PLAN_SCHEMA, REVIEW_SCHEMA, SCHEMA_BY_PURPOSE };

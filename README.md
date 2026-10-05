@@ -1,5 +1,20 @@
 # clubOrchestra-lab
 
+**Purpose (verbatim, Icelandic; it overrides everything else):** see
+[docs/clubOrchestra_samantekt_verkefnis_v1.0.md](docs/clubOrchestra_samantekt_verkefnis_v1.0.md) §1.
+In short, two AIs from two vendors (OpenAI planner + Claude worker) check each other's work, and
+everything the owner does not need to answer is handled automatically. Only the following go to
+the owner (Ási):
+- cost;
+- scope changes;
+- access or work only he can provide;
+- irreversible or security/key matters;
+- **anything uncertain** (fail closed).
+
+Project documents (Icelandic): [summary](docs/clubOrchestra_samantekt_verkefnis_v1.0.md) ·
+[functional description](docs/clubOrchestra_virknilysing_verkefnis_v1.0.md) ·
+[work plan](docs/clubOrchestra_verkefna_og_vinnuplan_v1.0.md).
+
 clubOrchestra control plane with simulated workers.
 
 - **P1:** the safety spine: state machine, idempotency, single-writer, fail-closed, circuit
@@ -18,7 +33,7 @@ clubOrchestra control plane with simulated workers.
   against `claude --help` 2.1.286.
 
 The core loop (CI → orchestrator → planner review → dispatch of the next task, with no human
-"continue") is called the **Review-Dispatch Loop (P4 milestone)**. Its mechanism is verified on real
+"continue") is called the **Review-Dispatch Loop (P4 milestone; Icelandic: áfangi P4)**. Its mechanism is verified on real
 GitHub with simulated workers. P4 acceptance with real agents waits for P3 Lot 3.
 
 Canonical spec: [clubOrchestra_verkefna_og_vinnuplan_v0.1.md](clubOrchestra_verkefna_og_vinnuplan_v0.1.md).
@@ -263,4 +278,21 @@ The replay limits use **FAKE** prices, and the loader refuses non-mock prices th
 
 ```bash
 node --test test/p3-lot2-replay.test.js test/p3-lot2-sdk-judge.test.js
+```
+
+## Escalation rule: AUTO or OWNER (`src/escalation.js`)
+
+Every dispatch decision is **AUTO** (handled automatically) or **OWNER** (cost, scope, access,
+irreversible, security, or **uncertain**):
+- A **policy floor in code** makes `spend`, `enable_api_keys` and `deploy` always OWNER. The
+  planner can raise AUTO to OWNER, never lower it.
+- A missing or unclear classification is OWNER/uncertain.
+- On OWNER the control plane writes an approval request and an **issue request**. The loop then
+  waits in `WAITING_APPROVAL`.
+- The orchestrator workflow opens the issue with `gh` and `GITHUB_TOKEN`, **assigned to
+  `cluborchestra`** (no new secret; title and body come from files, never shell-interpolated
+  text).
+
+```bash
+node --test test/p3-escalation.test.js
 ```

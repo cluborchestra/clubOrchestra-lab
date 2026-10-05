@@ -6,6 +6,8 @@
 //
 //   PlannerAdapter.nextTask(view)  -> to-worker handoff | null (no more tasks)
 //   PlannerAdapter.review(evidence) -> { verdict: 'ACCEPT' | anything else }
+//   PlannerAdapter.classify(handoff) -> { class: 'AUTO'|'OWNER', category, reason } | null
+//     (escalation rule; null or anything unclear means OWNER, see src/escalation.js)
 //   WorkerAdapter.execute(handoff) -> task.completed event | null (result arrives later)
 //
 // Adapters may throw an AgentHaltError (src/agents/errors.js) to stop the loop fail-closed.
@@ -14,6 +16,7 @@ class PlannerAdapter {
   get kind() { return 'planner'; }
   nextTask() { throw new Error(`${this.constructor.name}.nextTask not implemented`); }
   review() { throw new Error(`${this.constructor.name}.review not implemented`); }
+  classify() { return null; } // no classification -> OWNER (fail closed)
 }
 
 class WorkerAdapter {

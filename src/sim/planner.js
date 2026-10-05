@@ -29,6 +29,14 @@ class SimPlanner extends PlannerAdapter {
     return { verdict: ok ? 'ACCEPT' : 'REJECT' };
   }
 
+  // Plan entries may carry owner: { category, reason } to model a task that needs the owner.
+  classify(handoff) {
+    const step = this.plan.find((t) => t.task_id === handoff.task_id);
+    if (!step) return null;
+    if (step.owner) return { class: 'OWNER', category: step.owner.category, reason: step.owner.reason || '' };
+    return { class: 'AUTO', category: null, reason: 'routine task within scope' };
+  }
+
   nextTask(view) {
     this.calls++;
     const step = this.plan.find((t) => !view.completed_tasks.includes(t.task_id));

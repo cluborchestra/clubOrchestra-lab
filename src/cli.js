@@ -10,6 +10,8 @@
 //   node src/cli.js approve <dir> <approval_id> --by <name>
 //   node src/cli.js deny <dir> <approval_id> --by <name>
 //   node src/cli.js reset <dir> --by <name>     human reset BLOCKED -> IDLE
+//   node src/cli.js owner-issues <dir> <outDir>        write <id>.title/<id>.md per unopened owner issue; print ids
+//   node src/cli.js owner-issue-opened <dir> <id> <url> record the opened issue URL (idempotent)
 //   node src/cli.js ingest <dir> <workflow_run.json> --git-dir <path> [--repo owner/name]
 //       P2 entry point used by .github/workflows/orchestrator.yml: GitHub workflow_run payload ->
 //       adapter -> intake -> control plane steps (CI-gated, head read from --git-dir).
@@ -22,6 +24,7 @@ const { SimWorker } = require('./sim/worker');
 const { OutboxWorker } = require('./outboxWorker');
 const { GitRefs } = require('./gitRefs');
 const { ingestWorkflowRun } = require('./ingest');
+const { OwnerIssueOutbox } = require('./ownerIssues');
 
 const APPROVAL_PLAN = [DEFAULT_PLAN[0], { task_id: 'CO-SIM-003', action: 'deploy', objective: 'Simulated deploy (approval-gated)' }];
 
@@ -124,6 +127,22 @@ async function main(argv) {
       console.log(JSON.stringify({ stopped: r.stopped, steps: r.steps, ...summary(cp) }, null, 2));
       return 0;
     }
+    case 'owner-issues': {
+      const [dir, outDir] = args;
+      if (!dir || !outDir) throw new Error('usage: owner-issues <dir> <outDir>');
+      fs.mkdirSync(outDir, { recursive: true });
+      for (const r of new OwnerIssueOutbox(dir).pending()) {
+        fs.writeFileSync(path.join(outDir, `${r.approval_id}.title`), r.title);
+        fs.writeFileSync(path.join(outDir, `${r.approval_id}.md`), `${r.body}\n`);
+        console.log(r.approval_id);
+      }
+      return 0;
+    }
+    case 'owner-issue-opened': {
+      const [dir, id, url] = args;
+      new OwnerIssueOutbox(dir).markOpened(id, url);
+      return 0;
+    }
     case 'reset': {
       const by = flag(args, '--by');
       await makeCp(args[0]).humanReset({ by });
@@ -131,7 +150,7 @@ async function main(argv) {
       return 0;
     }
     default:
-      console.error('usage: node src/cli.js <demo|demo-approval|init|run|status|approve|deny|reset|ingest> ...');
+      console.error('usage: node src/cli.js <demo|demo-approval|init|run|status|approve|deny|reset|ingest|owner-issues|owner-issue-opened> ...');
       return 2;
   }
 }

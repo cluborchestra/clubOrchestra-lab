@@ -29,9 +29,11 @@ class MockModelClient {
 // same review rule), serialised as model output.
 function simPlannerResponder(opts = {}) {
   const sim = new SimPlanner(opts);
-  return (req) => (req.purpose === 'plan'
-    ? JSON.stringify({ task: sim.nextTask(req.input) })
-    : JSON.stringify(sim.review(req.input)));
+  return (req) => {
+    if (req.purpose !== 'plan') return JSON.stringify(sim.review(req.input));
+    const task = sim.nextTask(req.input);
+    return JSON.stringify({ task, decision: task ? sim.classify(task) : null });
+  };
 }
 
 // Worker responses: a from-worker result per attempt. script maps task_id -> ['PASS'|'FAIL', ...];

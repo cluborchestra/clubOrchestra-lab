@@ -275,7 +275,7 @@ test('untrusted output: malformed planner/worker output fails closed; review nee
   // Near-miss verdicts never accept: each review counts as a failure until the breaker trips.
   const sim = new SimPlanner();
   for (const verdict of ['ACCEPT ', 'accept', 'ACCEPTED']) {
-    const responder = (req) => JSON.stringify(req.purpose === 'plan' ? { task: sim.nextTask(req.input) } : { verdict });
+    const responder = (req) => JSON.stringify(req.purpose === 'plan' ? { task: sim.nextTask(req.input), decision: { class: 'AUTO', category: null, reason: 'routine' } } : { verdict });
     const loop = createLocalLoop({ root: tmpDir('review'), makePlanner: ({ controlDir }) => agents(controlDir, { plannerResponder: responder }).planner });
     await loop.cp.start();
     const r = await pump(loop);

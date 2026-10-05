@@ -37,7 +37,7 @@ pass on GitHub Actions (CI run 37355805656), and the live P2b run below used it 
 | 6 | Local harness: whole chain offline, no human "continue" | TESTED | `harness/` | `full local chain: …`, `deterministic: …` |
 | — | CI failure + planner-review rejection go through the circuit breaker | TESTED | `src/controlPlane.js` | `CI failure …`, `planner review REJECT …` |
 | — | `ingest` CLI (what the orchestrator workflow runs) | TESTED | `src/cli.js`, `src/ingest.js` | `cli ingest: …` |
-| 7 | Full suite green (now 106: P1 31 + P2a 19 + P2b 5 + P3 Lot 1 16 + P3 Lot 2 35) | TESTED | — | `npm test` |
+| 7 | Full suite green (now 120: P1 31 + P2a 19 + P2b 5 + P3 Lot 1 16 + P3 Lot 2 35 + escalation 14) | TESTED | — | `npm test` |
 | 8 | Offline: no network modules; harness spawns only local `git` | TESTED | — | `offline: …` ×2 |
 
 ## P2b — GitHub wiring + first live run (CO-P2b-001)
@@ -46,7 +46,7 @@ Repo: https://github.com/cluborchestra/clubOrchestra-lab (public). `main` = `159
 PR #1. It was a merge commit, so the P1/P2a/P2b SHAs are preserved. `main` is protected.
 `ORCHESTRATOR_ENABLED=true`.
 
-### Review-Dispatch Loop (P4 milestone) on real GitHub: E2E_VERIFIED with simulated workers (2026-10-05)
+### Review-Dispatch Loop (P4 milestone / áfangi P4) on real GitHub: E2E_VERIFIED with simulated workers (2026-10-05)
 One task (`CO-SIM-001`), simulated worker, no API keys, no cost. The run was:
 
 - push to `co/`
@@ -193,6 +193,8 @@ traffic, no key was read and no model was called.
 | 2 | **Worker flags verified** against `claude --help` of **Claude Code 2.1.286** (the desktop app's bundled CLI; only `--version`/`--help` were run). `--allowedTools` = "comma or space-separated". `--max-turns` is **not** in 2.1.286's help, so it was removed. It is replaced by `--max-budget-usd <per_call_max_usd>` (a hard per-run dollar cap), plus `--bare` and `--permission-prompts none`. | VERIFIED (help text) | `src/agents/claudeCode.js`; `runs/claude-help-2.1.286.txt` (local, sha256 13dd71866e4b6fde…) |
 | 3 | **Environments vs. real branches:** `workflow_run` (orchestrator) and `repository_dispatch` (worker) both run on the default branch (`github.ref = main`), so the `main`-only rule matches. The required reviewer stays on for all of Lot 3 and stops automation; removing it is a later decision by Ási. | DOCUMENTED | `SECURITY_MODEL.md` §2 |
 | 4 | **Provider budgets are MANDATORY** in the Lot 3 checklist (because of the §4a ledger risk) | DOCUMENTED | `SECURITY_MODEL.md` §6 item 3 |
+| 5 | **Escalation rule in code:** every dispatch decision is AUTO or OWNER (cost/scope/access/irreversible/security/uncertain). The policy floor can only be raised by the planner, and an unclassifiable decision is OWNER. OWNER writes an approval request and a GitHub Issue request assigned to `cluborchestra`, and the loop waits. The orchestrator opens the issue with `gh` + `GITHUB_TOKEN` (`issues: write`, no new secret). The planner's plan schema carries `decision`. | TESTED (14) | `src/escalation.js`, `src/ownerIssues.js`, `test/p3-escalation.test.js`; workflow step static-tested, not yet run live |
+| 6 | Icelandic project documents v1.0: summary (purpose verbatim), functional description, work plan | DONE | `docs/clubOrchestra_*_v1.0.md` |
 | — | **Finding:** workflow-level `concurrency` keeps only one pending run, and skipped (PR-CI) orchestrator runs also enter the group, so a pending real ingest can be cancelled (lost event, no double spend). Recommended for Lot 3: job-level concurrency + the watchdog. Not changed here. | OPEN | `SECURITY_MODEL.md` §4a |
 
 Full worker invocation (`config/agent-limits.json`, `per_call_max_usd` from the active limits):
@@ -206,7 +208,10 @@ claude -p --bare --output-format json --max-budget-usd <per_call_max_usd> --perm
 ### Backlog (not started)
 - **B1 Owner notifications:** on BLOCKED, on "approval needed", or at >80% of the daily cap, open a
   GitHub Issue assigned to `cluborchestra` (GitHub emails `orchestra@`). Uses `GITHUB_TOKEN`, no
-  new secret. Never `netoryggi@` or `p9@`.
+  new secret. Never `netoryggi@` or `p9@`. *Partly done in Lot 2b:* OWNER decisions already open
+  issues. BLOCKED and the 80% alert remain.
+- **B3** approval through the issue itself (a label or comment from `cluborchestra`) instead of
+  editing the approval file.
 - **B2 `OWNER_CARD.md`:** one plain-language page for the owner after a long break: kill switch,
   approvals, where to see the state, key rotation.
 

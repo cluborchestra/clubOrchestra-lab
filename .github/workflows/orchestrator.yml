@@ -32,6 +32,7 @@ concurrency:
 
 permissions:
   contents: write # push data/ to orchestra-state; main is protected and never pushed to
+  issues: write # open owner-decision issues (escalation rule), assigned to cluborchestra
 
 jobs:
   ingest:
@@ -61,6 +62,24 @@ jobs:
           REPO: ${{ github.repository }}
         run: node src/cli.js ingest state/data "$GITHUB_EVENT_PATH" --git-dir .git --repo "$REPO"
       # Later (P2b follow-up): turn state/data/outbox/<task_id>.json into a repository_dispatch to the worker.
+      # Escalation rule: every OWNER decision becomes a GitHub Issue assigned to the owner (GitHub then
+      # emails them). Title/body come from files written by our code; untrusted text never reaches the
+      # shell. Idempotent: an existing issue with the approval id in its title is reused, and the URL
+      # is recorded in state so the next run skips it.
+      - name: Open owner-decision issues (assigned to cluborchestra)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          out="$RUNNER_TEMP/owner-issues"
+          mkdir -p "$out"
+          node src/cli.js owner-issues state/data "$out" | while read -r id; do
+            url=$(gh issue list --state all --search "$id in:title" --json url --jq '.[0].url // ""')
+            if [ -z "$url" ]; then
+              url=$(gh issue create --title "$(cat "$out/$id.title")" --body-file "$out/$id.md" --assignee cluborchestra)
+            fi
+            node src/cli.js owner-issue-opened state/data "$id" "$url"
+          done
       - name: Push state to orchestra-state (optimistic lock via non-forced push)
         working-directory: state
         run: |
