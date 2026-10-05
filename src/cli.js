@@ -58,14 +58,14 @@ function decide(dir, id, by, status) {
   console.log(`${id} -> ${status} by ${by}`);
 }
 
-function main(argv) {
+async function main(argv) {
   const [cmd, ...args] = argv;
   switch (cmd) {
     case 'demo': {
       const dir = freshDir(args[0] || path.join('runs', 'demo'));
       const cp = makeCp(dir).init();
-      cp.start();
-      const r = cp.run();
+      await cp.start();
+      const r = await cp.run();
       console.log(JSON.stringify({ stopped: r.stopped, steps: r.steps, ...summary(cp) }, null, 2));
       console.log('\n--- audit.jsonl ---');
       process.stdout.write(fs.readFileSync(cp.store.p.audit, 'utf8'));
@@ -74,8 +74,8 @@ function main(argv) {
     case 'demo-approval': {
       const dir = freshDir(args[0] || path.join('runs', 'demo-approval'));
       const cp = makeCp(dir, 'approval').init();
-      cp.start();
-      const r = cp.run();
+      await cp.start();
+      const r = await cp.run();
       console.log(JSON.stringify({ stopped: r.stopped, ...summary(cp) }, null, 2));
       console.log(`\nApprove with:  node src/cli.js approve ${dir} CO-SIM-003.deploy --by <name>`);
       console.log(`Then resume:   node src/cli.js run ${dir} --plan approval`);
@@ -87,8 +87,8 @@ function main(argv) {
       return 0;
     case 'run': {
       const cp = makeCp(args[0], flag(args, '--plan'));
-      if (cp.state().status === 'IDLE') cp.start();
-      const r = cp.run();
+      if (cp.state().status === 'IDLE') await cp.start();
+      const r = await cp.run();
       console.log(JSON.stringify({ stopped: r.stopped, steps: r.steps, ...summary(cp) }, null, 2));
       return 0;
     }
@@ -120,13 +120,13 @@ function main(argv) {
           return 0;
         }
       }
-      const r = cp.run();
+      const r = await cp.run();
       console.log(JSON.stringify({ stopped: r.stopped, steps: r.steps, ...summary(cp) }, null, 2));
       return 0;
     }
     case 'reset': {
       const by = flag(args, '--by');
-      makeCp(args[0]).humanReset({ by });
+      await makeCp(args[0]).humanReset({ by });
       console.log('reset to IDLE');
       return 0;
     }
@@ -136,6 +136,8 @@ function main(argv) {
   }
 }
 
-if (require.main === module) process.exitCode = main(process.argv.slice(2));
+if (require.main === module) {
+  main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (err) => { console.error(err.message); process.exitCode = 1; });
+}
 
 module.exports = { main };

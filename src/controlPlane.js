@@ -58,7 +58,8 @@ class ControlPlane {
 
   // ---- generic transactional step -----------------------------------------------------------
   // fn(s, tx, ctx) mutates the draft state s; tx(to, info) performs a checked transition.
-  _transact(fn) {
+  // Async: fn may await agent calls. The commit itself is synchronous (store + optimistic lock).
+  async _transact(fn) {
     const before = this.store.readState();
     const s = clone(before);
     const pendingAudit = [];
@@ -81,7 +82,7 @@ class ControlPlane {
     const note = (entry) => pendingAudit.push(entry);
 
     try {
-      fn(s, tx, ctx, note);
+      await fn(s, tx, ctx, note);
     } catch (err) {
       if (err instanceof IllegalTransitionError) return { progressed: false, reason: 'illegal_transition', error: err.message };
       throw err;
@@ -94,12 +95,12 @@ class ControlPlane {
       return { progressed: false, reason: r.reason };
     }
     for (const e of pendingAudit) this.audit(e);
-    for (const f of ctx.afterCommit) f();
+    for (const f of ctx.afterCommit) await f();
     return ctx.result;
   }
 
   // ---- public operations ----------------------------------------------------------------------
-  start({ actor = 'human' } = {}) {
+  async start({ actor = 'human' } = {}) {
     return this._transact((s, tx) => {
       s.current_owner = 'planner';
       tx('RUNNING', { actor, reason: 'start' });
@@ -107,14 +108,14 @@ class ControlPlane {
   }
 
   // Direct transition request (used by humans / tests). Illegal ones are rejected and logged.
-  transition(to, { actor = 'human', reason = null } = {}) {
-    const r = this._transact((s, tx) => tx(to, { actor, reason }));
+  async transition(to, { actor = 'human', reason = null } = {}) {
+    const r = await this._transact((s, tx) => tx(to, { actor, reason }));
     if (r.reason === 'illegal_transition') throw new IllegalTransitionError(this.state().status, to);
     return r;
   }
 
   // Human-only recovery from BLOCKED back to IDLE.
-  humanReset({ by }) {
+  async humanReset({ by }) {
     if (!by) throw new Error('humanReset requires `by`');
     return this._transact((s, tx) => {
       tx('IDLE', { actor: `human:${by}`, reason: 'human reset' });
@@ -124,7 +125,7 @@ class ControlPlane {
 
   // After a restart: compare durable state with the real repo (branch head) and resolve without
   // repeating work. Never re-dispatches a worker. Only acts once the durable inbox is drained.
-  reconcile({ actor = 'reconciler' } = {}) {
+  async reconcile({ actor = 'reconciler' } = {}) {
     if (!this.repo) throw new Error('reconcile requires a repo (GitRefs)');
     const pending = this.store.readInbox().length - (this.state().inbox_cursor || 0);
     if (pending > 0) {
@@ -132,7 +133,7 @@ class ControlPlane {
       return { decision: 'inbox_pending' };
     }
     let decision = null;
-    const r = this._transact((s, tx, ctx, note) => {
+    const r = await this._transact((s, tx, ctx, note) => {
       const record = (d, reason, extra = {}) => {
         decision = d;
         note({ kind: 'reconcile', actor, task_id: s.current_task_id, decision: d, reason, ...extra });
@@ -162,16 +163,16 @@ class ControlPlane {
   }
 
   // Restart entry point: drain durable inbox, reconcile against the repo, continue.
-  resume({ maxSteps } = {}) {
-    this.run({ maxSteps });
-    if (this.repo) this.reconcile();
+  async resume({ maxSteps } = {}) {
+    await this.run({ maxSteps });
+    if (this.repo) await this.reconcile();
     return this.run({ maxSteps });
   }
 
-  run({ maxSteps = 100 } = {}) {
+  async run({ maxSteps = 100 } = {}) {
     const trace = [];
     for (let i = 0; i < maxSteps; i++) {
-      const r = this.step();
+      const r = await this.step();
       trace.push(r);
       if (!r.progressed) return { state: this.state(), steps: i + 1, stopped: r.reason, trace };
     }
@@ -179,8 +180,8 @@ class ControlPlane {
     return { state: this.state(), steps: maxSteps, stopped: 'max_steps', trace };
   }
 
-  step() {
-    return this._transact((s, tx, ctx, note) => {
+  async step() {
+    return this._transact(async (s, tx, ctx, note) => {
       switch (s.status) {
         case 'RUNNING': return this._stepRunning(s, tx, ctx, note);
         case 'WAITING_APPROVAL': return this._stepWaitingApproval(s, tx, ctx, note);
@@ -198,12 +199,12 @@ class ControlPlane {
   }
 
   // ---- RUNNING: ask planner, apply policy, dispatch or gate ----------------------------------
-  _stepRunning(s, tx, ctx, note) {
+  async _stepRunning(s, tx, ctx, note) {
     // last_failure: why the previous attempt failed (data only, for the planner's retry; null otherwise).
     const view = Object.freeze({ completed_tasks: [...s.completed_tasks], last_verified_sha: s.last_verified_sha, last_failure: s.last_failure ? clone(s.last_failure) : null });
     let raw;
     try {
-      raw = this.planner.nextTask(view);
+      raw = await this.planner.nextTask(view);
     } catch (err) {
       if (err instanceof AgentHaltError) return this._halt(s, tx, ctx, note, err, { task_id: null, role: 'planner' });
       throw err;
@@ -281,14 +282,14 @@ class ControlPlane {
     note({ kind: 'task_dispatched', task_id: handoff.task_id, actor: this.actor, starting_sha: s.expected_sha });
     // The worker reports back through the intake. A worker may return its result event directly
     // (simulated) or nothing (the result arrives later as a separate event).
-    ctx.afterCommit.push(() => {
+    ctx.afterCommit.push(async () => {
       let ev;
       try {
-        ev = this.worker.execute(clone(handoff));
+        ev = await this.worker.execute(clone(handoff));
       } catch (err) {
         if (!(err instanceof AgentHaltError)) throw err;
         // The dispatch is already committed; stop in a follow-up transaction (WAITING_EVENT -> BLOCKED).
-        this._transact((s2, tx2, ctx2, note2) => this._halt(s2, tx2, ctx2, note2, err, { task_id: handoff.task_id, role: 'worker' }));
+        await this._transact((s2, tx2, ctx2, note2) => this._halt(s2, tx2, ctx2, note2, err, { task_id: handoff.task_id, role: 'worker' }));
         return;
       }
       if (ev !== undefined && ev !== null) this.intake(ev);
@@ -313,7 +314,7 @@ class ControlPlane {
   }
 
   // ---- WAITING_EVENT: consume one inbox event ---------------------------------------------------
-  _stepWaitingEvent(s, tx, ctx, note) {
+  async _stepWaitingEvent(s, tx, ctx, note) {
     const lines = this.store.readInbox();
     if (s.inbox_cursor >= lines.length) {
       ctx.result = { progressed: false, reason: 'waiting_event' };
@@ -364,7 +365,7 @@ class ControlPlane {
     note({ kind: 'worker_evidence_accepted', event_id: ev.event_id, task_id: ev.task_id, actor: this.actor, sha: ev.sha, reason: 'awaiting CI on exact sha' });
   }
 
-  _onCiResult(s, tx, ctx, note, ev) {
+  async _onCiResult(s, tx, ctx, note, ev) {
     if (s.awaiting !== 'ci') return this._stale(note, ev, 'not awaiting a CI result');
     if (ev.task_id !== s.current_task_id) return this._stale(note, ev, 'task_id is not the current task');
     // Exact-SHA gate: CI must be for the very commit we are waiting on ...
@@ -382,7 +383,7 @@ class ControlPlane {
     if (ev.status !== 'success') return this._fail(s, tx, ctx, note, ev, ['CI did not succeed']);
     let rejection;
     try {
-      rejection = this._plannerReview(ev);
+      rejection = await this._plannerReview(ev);
     } catch (err) {
       if (err instanceof AgentHaltError) return this._halt(s, tx, ctx, note, err, { task_id: ev.task_id, event_id: ev.event_id, role: 'planner' });
       throw err;
@@ -393,11 +394,11 @@ class ControlPlane {
   }
 
   // Planner evaluates evidence (spec §4.6). Only an exact { verdict: 'ACCEPT' } accepts.
-  _plannerReview(ev) {
+  async _plannerReview(ev) {
     if (typeof this.planner.review !== 'function') return 'planner has no review()';
     let out;
     try {
-      out = this.planner.review(Object.freeze(clone({ task_id: ev.task_id, sha: ev.sha, ci_status: ev.status, evidence_refs: ev.evidence_refs || [] })));
+      out = await this.planner.review(Object.freeze(clone({ task_id: ev.task_id, sha: ev.sha, ci_status: ev.status, evidence_refs: ev.evidence_refs || [] })));
     } catch (err) {
       if (err instanceof AgentHaltError) throw err; // spend/loop/output halts stop the loop, not retry it
       return `review threw: ${err.message}`;

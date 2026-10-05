@@ -2,8 +2,9 @@
 
 // Planner client for the OpenAI Responses API (POST /v1/responses, Structured Outputs).
 // Zero-dependency: it builds the HTTP request itself and hands it to an INJECTED transport
-//   transport(url, { method, headers, body }) -> { status, headers, body }   (synchronous)
-// so this module never opens a socket, never reads an environment variable and never sees a key.
+//   transport(url, { method, headers, body }) -> Promise<{ status, headers, body }>
+// (async, like fetch) so this module never opens a socket, never reads an environment variable and
+// never sees a key.
 // In Lot 2 the transport is a replay transport (src/agents/replay.js, marked .replay = true).
 // In Lot 3 a single live-transport file adds the Authorization header and does the I/O.
 //
@@ -29,8 +30,8 @@ function estimateTokens(...parts) {
   return Math.ceil(bytes / 3) + 32;
 }
 
-function sleepSync(ms) {
-  if (ms > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function sleep(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
 }
 
 function header(headers, name) {
@@ -50,10 +51,10 @@ function retryAfterMs(headers) {
 }
 
 class OpenAIResponsesClient {
-  constructor({ transport, model, limits, sleep = sleepSync, url = API_URL }) {
+  constructor({ transport, model, limits, sleep: wait = sleep, url = API_URL }) {
     if (typeof transport !== 'function') throw new TypeError('transport must be a function');
     if (typeof model !== 'string' || !model) throw new TypeError('model is required');
-    Object.assign(this, { transport, model, limits, sleep, url, provider: 'openai', replay: transport.replay === true });
+    Object.assign(this, { transport, model, limits, sleep: wait, url, provider: 'openai', replay: transport.replay === true });
   }
 
   buildBody(request) {
@@ -81,30 +82,30 @@ class OpenAIResponsesClient {
     return { input_tokens: estimateTokens(request.system, JSON.stringify(request.input)) };
   }
 
-  complete(request) {
+  async complete(request) {
     const { url, init } = this.buildRequest(request);
     const t = this.limits.transport;
     for (let attempt = 0; ; attempt++) {
       const last = attempt >= t.max_retries;
       let res;
       try {
-        res = this.transport(url, init);
+        res = await this.transport(url, init);
       } catch (err) {
         if (!TRANSIENT_ERRORS.includes(err.code)) throw new AgentTransportError('TRANSPORT_ERROR', `openai: transport failed: ${err.code || err.message}`);
         if (last) throw new AgentTransportError('UPSTREAM_UNAVAILABLE', `openai: ${err.code} after ${attempt + 1} attempts`);
-        this.sleep(t.backoff_ms * 2 ** attempt);
+        await this.sleep(t.backoff_ms * 2 ** attempt);
         continue;
       }
       if (res.status === 429) {
         const wait = retryAfterMs(res.headers);
         if (wait === null || wait > t.max_retry_after_s * 1000) throw new AgentTransportError('RATE_LIMITED', `openai: 429, retry-after ${header(res.headers, 'retry-after')} exceeds ${t.max_retry_after_s}s or is missing`);
         if (last) throw new AgentTransportError('RATE_LIMITED', `openai: 429 after ${attempt + 1} attempts`);
-        this.sleep(wait);
+        await this.sleep(wait);
         continue;
       }
       if (res.status >= 500) {
         if (last) throw new AgentTransportError('UPSTREAM_UNAVAILABLE', `openai: HTTP ${res.status} after ${attempt + 1} attempts`);
-        this.sleep(t.backoff_ms * 2 ** attempt);
+        await this.sleep(t.backoff_ms * 2 ** attempt);
         continue;
       }
       if (res.status !== 200) throw new AgentTransportError(`CLIENT_ERROR_${res.status}`, `openai: HTTP ${res.status} (not retried)`);

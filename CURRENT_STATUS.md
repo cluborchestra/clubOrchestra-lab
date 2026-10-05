@@ -1,6 +1,6 @@
 # CURRENT_STATUS — clubOrchestra-lab
 
-**Updated:** 2026-10-05 · **Tasks:** CO-P1-001, CO-P2a-001, CO-P2b-001, CO-P3-LOT1-001, CO-P3-LOT2-001 · **Phase:** P3 Lot 2 (replay dry run with real API shapes; no live calls)
+**Updated:** 2026-10-05 · **Tasks:** CO-P1-001, CO-P2a-001, CO-P2b-001, CO-P3-LOT1-001, CO-P3-LOT2-001, CO-P3-LOT2B-001 · **Phase:** P3 Lot 2b (async call path, verified worker flags; no live calls)
 Tags: PLANNED / IMPLEMENTED / TESTED / E2E_VERIFIED / DISABLED (spec §8).
 TESTED = covered by an automated test in `test/` that passes with `npm test`.
 
@@ -46,7 +46,7 @@ Repo: https://github.com/cluborchestra/clubOrchestra-lab (public). `main` = `159
 PR #1. It was a merge commit, so the P1/P2a/P2b SHAs are preserved. `main` is protected.
 `ORCHESTRATOR_ENABLED=true`.
 
-### Core loop on real GitHub: E2E_VERIFIED (2026-10-05)
+### Review-Dispatch Loop (P4 milestone) on real GitHub: E2E_VERIFIED with simulated workers (2026-10-05)
 One task (`CO-SIM-001`), simulated worker, no API keys, no cost. The run was:
 
 - push to `co/`
@@ -72,9 +72,10 @@ No human "continue" anywhere in that chain. Full evidence:
 with a single `duplicate_event_ignored` for `gh-run-37358003409-1`, `version` 6→7,
 `inbox_cursor` 3→4, nothing else changed.
 
-**Scope note:** this run proves on real GitHub the core loop mechanism that spec P4 builds on. Spec P4
-itself (≥2 tasks in a row, starting from a goal, with real agents) is still PLANNED, because it needs
-P3 (real agents) first.
+**Name and scope:** the core loop is called the **Review-Dispatch Loop (P4 milestone)**: CI → orchestrator
+→ planner review → dispatch of the next task, with no human "continue". This run verified its
+mechanism on real GitHub with **simulated** workers. P4's acceptance in the spec (≥2 tasks in a row,
+starting from a goal, with **real** agents) is still PLANNED: it needs P3 Lot 3 first.
 
 ### Wiring
 | Item | Status | Where / proof |
@@ -181,6 +182,34 @@ run, and nothing was spent.
 - Lot 1 tests: three assertions were updated for the new APIs (`record(ticket, …)`, the
   `reserved_usd` entry field, the review `reason`). They are as strict as before.
 
+## P3 Lot 2b — async call path + verified worker flags (CO-P3-LOT2B-001)
+
+**P3 Lot 2b: IMPLEMENTED + TESTED (local).** Real agents are still not wired. There was no network
+traffic, no key was read and no model was called.
+
+| # | Item | Status | Where / proof |
+|---|---|---|---|
+| 1 | **Async call path** instead of a sync bridge, so the first paid run tests one new thing (live I/O). Covers `ControlPlane` (`step/run/start/transition/humanReset/reconcile/resume`), `callModel`, the adapters, the OpenAI/Claude clients, the replay transport/runner, the harness and the CLI. Sims stay synchronous (awaiting a plain value is a no-op). Behaviour is unchanged: all 106 tests pass, and the local harness and CLI demo give the same SHAs as before. | TESTED | `src/controlPlane.js`, `src/agents/*`; no un-awaited calls in tests (checked) |
+| 2 | **Worker flags verified** against `claude --help` of **Claude Code 2.1.286** (the desktop app's bundled CLI; only `--version`/`--help` were run). `--allowedTools` = "comma or space-separated". `--max-turns` is **not** in 2.1.286's help, so it was removed. It is replaced by `--max-budget-usd <per_call_max_usd>` (a hard per-run dollar cap), plus `--bare` and `--permission-prompts none`. | VERIFIED (help text) | `src/agents/claudeCode.js`; `runs/claude-help-2.1.286.txt` (local, sha256 13dd71866e4b6fde…) |
+| 3 | **Environments vs. real branches:** `workflow_run` (orchestrator) and `repository_dispatch` (worker) both run on the default branch (`github.ref = main`), so the `main`-only rule matches. The required reviewer stays on for all of Lot 3 and stops automation; removing it is a later decision by Ási. | DOCUMENTED | `SECURITY_MODEL.md` §2 |
+| 4 | **Provider budgets are MANDATORY** in the Lot 3 checklist (because of the §4a ledger risk) | DOCUMENTED | `SECURITY_MODEL.md` §6 item 3 |
+| — | **Finding:** workflow-level `concurrency` keeps only one pending run, and skipped (PR-CI) orchestrator runs also enter the group, so a pending real ingest can be cancelled (lost event, no double spend). Recommended for Lot 3: job-level concurrency + the watchdog. Not changed here. | OPEN | `SECURITY_MODEL.md` §4a |
+
+Full worker invocation (`config/agent-limits.json`, `per_call_max_usd` from the active limits):
+
+```
+claude -p --bare --output-format json --max-budget-usd <per_call_max_usd> --permission-prompts none \
+  --allowedTools "Read,Edit,Write,Bash(npm test),Bash(git status),Bash(git diff *),Bash(git add *),Bash(git commit *)" \
+  --append-system-prompt "<WORKER_SYSTEM>"     (handoff on stdin)
+```
+
+### Backlog (not started)
+- **B1 Owner notifications:** on BLOCKED, on "approval needed", or at >80% of the daily cap, open a
+  GitHub Issue assigned to `cluborchestra` (GitHub emails `orchestra@`). Uses `GITHUB_TOKEN`, no
+  new secret. Never `netoryggi@` or `p9@`.
+- **B2 `OWNER_CARD.md`:** one plain-language page for the owner after a long break: kill switch,
+  approvals, where to see the state, key rotation.
+
 ## Known limitations
 
 - `state.lock` + `version` is the local lock. On GitHub, `orchestrator.yml` adds Actions
@@ -216,9 +245,10 @@ run, and nothing was spent.
 - P3 Lot 1: pre-call estimates use `max_output_tokens` for output (worst case). With the default
   mock pricing everything is 0 USD; real accuracy is a Lot 2 item.
 - P3 Lot 2: the fixtures are hand-authored from the documented formats. The OpenAI ones are
-  checked against `openai@7.28.0` parsing and error classes. The Claude Code ones cannot be checked
-  against a tool without running `claude` (forbidden), so the exact `--allowedTools` syntax and exit
-  codes must be confirmed in Lot 3.
+  checked against `openai@7.28.0` parsing and error classes. The `--allowedTools` syntax and the flags
+  we use are now verified against `claude --help` 2.1.286 (Lot 2b). The Claude Code **output**
+  shape and exit codes are not verified, because `claude -p` is still forbidden; Lot 3's first run
+  confirms them.
 - P3 Lot 2: the worker output must be a bare JSON object. If real Claude Code wraps it in prose or a
   code fence, it fails closed (`INVALID_OUTPUT`); Lot 3 may need a strict extractor.
 - P3 Lot 2: the planner token estimate is about 3 bytes per token plus 32, which is deliberately

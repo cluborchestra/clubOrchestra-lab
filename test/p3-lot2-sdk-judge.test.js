@@ -32,7 +32,7 @@ function sdkWith(fetchImpl) {
 }
 const serve = (f) => async () => new Response(typeof f.body === 'string' ? f.body : JSON.stringify(f.body), { status: f.status, headers: f.headers });
 
-test('SDK under test is the pinned devDependency', () => {
+test('SDK under test is the pinned devDependency', async () => {
   assert.equal(SDK_VERSION, '7.28.0');
   assert.equal(require('../package.json').devDependencies.openai, '7.28.0');
   assert.deepEqual(Object.keys(require('../package.json').dependencies || {}), []); // production stays zero-dep
@@ -98,6 +98,6 @@ for (const [name, sdkClass, status, ourCode] of [
     const Cls = sdkModule[sdkClass] || OpenAI[sdkClass];
     await assert.rejects(sdkWith(serve(f)).responses.create({ model: MODEL, input: 'x' }), (e) => e instanceof Cls && e.status === status);
     const client = ours(makeReplayTransport({ k: [f] }));
-    assert.throws(() => client.complete({ purpose: 'review', role: 'planner', key: 'k', system: 's', input: {}, max_output_tokens: 10 }), (e) => e.code === ourCode);
+    await assert.rejects(async () => await client.complete({ purpose: 'review', role: 'planner', key: 'k', system: 's', input: {}, max_output_tokens: 10 }), (e) => e.code === ourCode);
   });
 }

@@ -9,7 +9,7 @@
   "loop_detect_repeats": 2,
 
   "transport": { "max_retries": 2, "max_retry_after_s": 30, "backoff_ms": 1000 },
-  "claude_code": { "max_turns": 8, "allowed_tools": ["Read", "Edit", "Write", "Bash(npm test)", "Bash(git status)", "Bash(git diff *)", "Bash(git add *)", "Bash(git commit *)"] },
+  "claude_code": { "allowed_tools": ["Read", "Edit", "Write", "Bash(npm test)", "Bash(git status)", "Bash(git diff *)", "Bash(git add *)", "Bash(git commit *)"] },
 
   "daily_spend_cap_usd": 0,
   "per_call_max_usd": 0,
@@ -25,6 +25,6 @@
     "max_calls_per_task": "e.g. planner 3 / worker 3",
     "pricing_usd_per_mtok": "add one entry per real model actually used: \"openai/<model>\": { input, output } at the provider's current list prices, and \"anthropic/claude-code-headless\": { reported_cost: true } (Claude Code reports total_cost_usd); a model without an entry is refused",
     "transport": "keep max_retries small (each retry can cost); max_retry_after_s caps how long a 429 may make us wait",
-    "claude_code": "max_turns and the exact allowed_tools list for the worker"
+    "claude_code": "the exact allowed_tools list for the worker (the run is capped by --max-budget-usd = per_call_max_usd)"
   }
 }

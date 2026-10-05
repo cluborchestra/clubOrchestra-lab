@@ -16,17 +16,18 @@ const crash = process.argv.includes('--crash');
 const root = path.join(__dirname, '..', 'runs', crash ? 'local-loop-crash' : 'local-loop');
 const loop = createLocalLoop({ root, crashAfterCommit: crash ? ['CO-SIM-001'] : [] });
 
-loop.cp.start();
+(async () => {
+await loop.cp.start();
 let callsBeforeRestart = [];
 try {
-  pump(loop);
+  await pump(loop);
 } catch (err) {
   console.log(`!! ${err.message} -- restarting control plane from durable state`);
   callsBeforeRestart = loop.worker.calls;
   loop.newControlPlane({ crash: [] });
-  loop.cp.resume(); // drain inbox, reconcile against git head, continue
+  await loop.cp.resume(); // drain inbox, reconcile against git head, continue
 }
-const r = pump(loop);
+const r = await pump(loop);
 
 const first = loop.ci.delivered[0];
 console.log('--- sample workflow_run payload (simulated GitHub delivery) ---');
@@ -50,3 +51,4 @@ console.log(JSON.stringify({
   human_continue_used: false,
 }, null, 2));
 process.exitCode = r.state.status === 'COMPLETE' ? 0 : 1;
+})();

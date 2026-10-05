@@ -13,7 +13,7 @@ const wf = (f) => fs.readFileSync(path.join(__dirname, '..', '.github', 'workflo
 const PINNED = /uses: actions\/(checkout|setup-node)@[0-9a-f]{40} # v\d+\.\d+\.\d+$/;
 
 // ---- pre-merge adapter fix -----------------------------------------------------------------------
-test('adapter: CI on a non-task branch (feature-branch PR) is ignored as "not ours"', () => {
+test('adapter: CI on a non-task branch (feature-branch PR) is ignored as "not ours"', async () => {
   for (const branch of ['feat/co-p2b-001-github-wiring', 'main', 'orchestra-state', 'cox/CO-1']) {
     const out = workflowRunToEvent(makeWorkflowRun({ id: 1, branch, sha: 'a'.repeat(40), conclusion: 'success', updated_at: '2026-10-04T12:00:00Z' }), { project_id: 'clubOrchestra-lab' });
     assert.equal(out.ignored, true, branch);
@@ -21,27 +21,27 @@ test('adapter: CI on a non-task branch (feature-branch PR) is ignored as "not ou
   }
 });
 
-test('adapter: PR CI result arriving mid-loop does not block or change state; loop still completes', () => {
+test('adapter: PR CI result arriving mid-loop does not block or change state; loop still completes', async () => {
   const loop = createLocalLoop({ root: tmpDir('p2b-pr-ci'), redeliver: false });
-  loop.cp.start();
-  loop.cp.run(); // awaiting CI for task 1
+  await loop.cp.start();
+  await loop.cp.run(); // awaiting CI for task 1
   const before = loop.cp.state();
   const out = ingestWorkflowRun(loop.cp, makeWorkflowRun({
     id: 555, branch: 'feat/co-p2b-001-github-wiring', sha: 'b'.repeat(40), conclusion: 'failure', updated_at: '2026-10-04T12:00:00Z',
   }), { repo_full_name: REPO_FULL_NAME });
   assert.equal(out.ignored, true);
-  loop.cp.run();
+  await loop.cp.run();
   const after = loop.cp.state();
   assert.equal(after.status, 'WAITING_EVENT');
   assert.equal(after.version, before.version); // nothing was taken in
   assert.equal(after.failure_count, 0);
   assert.equal(loop.cp.store.readInbox().length, before.inbox_cursor);
   assert.ok(loop.cp.store.readAudit().some((e) => e.kind === 'ingest_ignored' && /not a task branch/.test(e.reason)));
-  assert.equal(pump(loop).state.status, 'COMPLETE');
+  assert.equal((await pump(loop)).state.status, 'COMPLETE');
 });
 
 // ---- orchestrator wiring -------------------------------------------------------------------------
-test('orchestrator: disabled unless ORCHESTRATOR_ENABLED == "true"; only push-CI from this repo', () => {
+test('orchestrator: disabled unless ORCHESTRATOR_ENABLED == "true"; only push-CI from this repo', async () => {
   const o = wf('orchestrator.yml');
   const cond = o.match(/ {4}if: >-\n((?: {6}.*\n)+)/);
   assert.ok(cond, 'job-level if: present');
@@ -54,7 +54,7 @@ test('orchestrator: disabled unless ORCHESTRATOR_ENABLED == "true"; only push-CI
   assert.equal((o.match(/^ {2}\w[\w-]*:\n {4}if:/gm) || []).length, 1); // the only job, and it is gated
 });
 
-test('orchestrator: state-branch pattern; never pushes to main; single writer', () => {
+test('orchestrator: state-branch pattern; never pushes to main; single writer', async () => {
   const o = wf('orchestrator.yml');
   assert.match(o, /workflow_run:\n\s+workflows: \[CI\]\n\s+types: \[completed\]/);
   assert.match(o, /^concurrency:\n\s+group: clubOrchestra\n\s+cancel-in-progress: false$/m);
@@ -67,7 +67,7 @@ test('orchestrator: state-branch pattern; never pushes to main; single writer', 
   assert.match(o, /^permissions:\n\s+contents: write/m);
 });
 
-test('workflows: actions pinned to commit SHAs, no secrets, no script injection', () => {
+test('workflows: actions pinned to commit SHAs, no secrets, no script injection', async () => {
   for (const f of ['ci.yml', 'orchestrator.yml']) {
     const text = wf(f);
     const uses = text.split('\n').filter((l) => /uses:/.test(l));

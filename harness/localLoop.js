@@ -172,10 +172,10 @@ function createLocalLoop({ root, plan, ciScript, redeliver = true, crashAfterCom
 
 // Event pump = simulated GitHub: run the control plane until it waits, then deliver the next CI
 // webhook. There is no human input anywhere in this loop.
-function pump(loop, { maxRounds = 100 } = {}) {
+async function pump(loop, { maxRounds = 100 } = {}) {
   let r;
   for (let i = 0; i < maxRounds; i++) {
-    r = loop.cp.run();
+    r = await loop.cp.run();
     if (r.stopped === 'waiting_event' && loop.ci.pending()) {
       loop.ci.deliverNext(loop.cp);
       continue;

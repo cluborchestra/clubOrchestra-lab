@@ -14,6 +14,12 @@ clubOrchestra control plane with simulated workers.
   No real API, no keys, no cost. Secrets plan: [SECURITY_MODEL.md](SECURITY_MODEL.md).
 - **P3 Lot 2:** replay dry run with the **real API shapes**: OpenAI Responses (planner) and Claude
   Code headless JSON (worker), served from fixtures. No live calls are possible.
+- **P3 Lot 2b:** the agent call path is **async** end to end, and the worker flags are verified
+  against `claude --help` 2.1.286.
+
+The core loop (CI → orchestrator → planner review → dispatch of the next task, with no human
+"continue") is called the **Review-Dispatch Loop (P4 milestone)**. Its mechanism is verified on real
+GitHub with simulated workers. P4 acceptance with real agents waits for P3 Lot 3.
 
 Canonical spec: [clubOrchestra_verkefna_og_vinnuplan_v0.1.md](clubOrchestra_verkefna_og_vinnuplan_v0.1.md).
 Status per feature: [CURRENT_STATUS.md](CURRENT_STATUS.md).
@@ -238,11 +244,11 @@ node --test test/p3-lot1-agents.test.js
 | Role | Adapter | Wire format | Lot 2 I/O |
 |---|---|---|---|
 | Planner | `src/agents/openaiResponses.js` | `POST /v1/responses`, strict `json_schema` (`src/agents/schemas.js`), `store: false` | injected `transport(url, init)` → replay (`src/agents/replay.js`) |
-| Worker | `src/agents/claudeCode.js` | `claude -p --output-format json --max-turns N --allowedTools …` | injected `runner(invocation)` → replay |
+| Worker | `src/agents/claudeCode.js` | `claude -p --bare --output-format json --max-budget-usd <per_call_max_usd> --permission-prompts none --allowedTools <list> --append-system-prompt …` (flags verified against `claude --help` 2.1.286) | injected `runner(invocation)` → replay |
 
 The adapters never set an Authorization header, never read the environment, and never open
-sockets or processes. Lot 3 adds exactly one live file (`src/agents/live.js`, see
-`SECURITY_MODEL.md`).
+sockets or processes. The whole call path is `async`: `ControlPlane.run/step/start/…` return
+promises. Lot 3 adds exactly one live file (`src/agents/live.js`, see `SECURITY_MODEL.md`).
 
 The guard (`src/agents/spendGuard.js`):
 - reserves each call's estimate before the call, under a ledger lock;

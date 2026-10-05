@@ -52,7 +52,7 @@ const ledger = (dir) => JSON.parse(fs.readFileSync(path.join(dir, 'spend', 'ledg
 const escalation = (cp) => cp.store.listEscalations()[0];
 
 // ---- 1. adapter contract ----------------------------------------------------------------------------
-test('contract: sims, outbox/git workers and mock model agents all implement the adapter interface', () => {
+test('contract: sims, outbox/git workers and mock model agents all implement the adapter interface', async () => {
   const dir = tmpDir('contract');
   const a = agents(dir);
   for (const p of [new SimPlanner(), a.planner]) {
@@ -69,24 +69,24 @@ test('contract: sims, outbox/git workers and mock model agents all implement the
   assert.throws(() => new AgentPlanner({ client: a.pClient }), /SpendGuard is required/);
 });
 
-test('contract: mock planner in -> exactly the existing to-worker handoff out (same as the sim)', () => {
+test('contract: mock planner in -> exactly the existing to-worker handoff out (same as the sim)', async () => {
   const dir = tmpDir('contract-plan');
   const { planner } = agents(dir);
   const view = { completed_tasks: [], last_verified_sha: ZERO };
-  const h = planner.nextTask(view);
+  const h = await planner.nextTask(view);
   assert.deepEqual(Object.keys(h).sort(), [...HANDOFF_REQUIRED].sort());
-  assert.deepEqual(h, new SimPlanner().nextTask(view));
+  assert.deepEqual(h, await new SimPlanner().nextTask(view));
   const cp = new ControlPlane({ dir, planner, worker: new SimWorker() }).init();
   assert.equal(cp._checkHandoff(h, { last_verified_sha: ZERO }), null);
-  assert.equal(planner.nextTask({ completed_tasks: ['CO-SIM-001', 'CO-SIM-002'], last_verified_sha: ZERO }), null);
-  assert.deepEqual(planner.review({ task_id: 'CO-SIM-001', sha: ZERO, ci_status: 'success', evidence_refs: [] }), { verdict: 'ACCEPT', reason: null });
+  assert.equal(await planner.nextTask({ completed_tasks: ['CO-SIM-001', 'CO-SIM-002'], last_verified_sha: ZERO }), null);
+  assert.deepEqual(await planner.review({ task_id: 'CO-SIM-001', sha: ZERO, ci_status: 'success', evidence_refs: [] }), { verdict: 'ACCEPT', reason: null });
 });
 
-test('contract: mock worker in -> valid task.completed envelope + from-worker result out', () => {
+test('contract: mock worker in -> valid task.completed envelope + from-worker result out', async () => {
   const dir = tmpDir('contract-work');
   const { worker } = agents(dir);
-  const h = new SimPlanner().nextTask({ completed_tasks: [], last_verified_sha: ZERO });
-  const ev = worker.execute(h);
+  const h = await new SimPlanner().nextTask({ completed_tasks: [], last_verified_sha: ZERO });
+  const ev = await worker.execute(h);
   assert.deepEqual(validateEvent(ev, { project_id: 'clubOrchestra-lab' }), { ok: true, errors: [] });
   assert.equal(ev.type, 'task.completed');
   assert.equal(ev.event_id, 'evt-agent-CO-SIM-001-1');
@@ -95,24 +95,24 @@ test('contract: mock worker in -> valid task.completed envelope + from-worker re
   assert.deepEqual(verifyEvidence(ev, { current_task_id: 'CO-SIM-001', expected_sha: ZERO }), { stale: false, errors: [] });
 });
 
-test('contract: extra fields in model output are dropped (never reach the control plane)', () => {
+test('contract: extra fields in model output are dropped (never reach the control plane)', async () => {
   const dir = tmpDir('contract-strip');
   const sim = new SimPlanner();
   const { planner, worker } = agents(dir, {
     plannerResponder: (req) => JSON.stringify({ task: { ...sim.nextTask(req.input), requires_approval: false, status: 'COMPLETE' }, approve_all: true }),
     workerResponder: (req) => JSON.stringify({ ...JSON.parse(scriptedWorkerResponder()(req)), next_status: 'COMPLETE', approve: 'deploy' }),
   });
-  const h = planner.nextTask({ completed_tasks: [], last_verified_sha: ZERO });
+  const h = await planner.nextTask({ completed_tasks: [], last_verified_sha: ZERO });
   assert.ok(!('requires_approval' in h) && !('status' in h));
-  const ev = worker.execute(h);
+  const ev = await worker.execute(h);
   assert.ok(!('next_status' in ev.payload) && !('approve' in ev.payload));
 });
 
 // ---- no behaviour change with mock adapters ----------------------------------------------------------
-test('mock agents drive the P1 loop exactly like the sims: 2 tasks -> COMPLETE, no "continue"', () => {
+test('mock agents drive the P1 loop exactly like the sims: 2 tasks -> COMPLETE, no "continue"', async () => {
   const { cp, dir, pClient, wClient } = cpWith('mock-p1');
-  cp.start();
-  const r = cp.run();
+  await cp.start();
+  const r = await cp.run();
   assert.equal(r.state.status, 'COMPLETE');
   assert.deepEqual(r.state.completed_tasks, ['CO-SIM-001', 'CO-SIM-002']);
   assert.deepEqual(transitions(cp), [
@@ -126,17 +126,17 @@ test('mock agents drive the P1 loop exactly like the sims: 2 tasks -> COMPLETE, 
   assert.equal(l.spent_usd_today, 0); // mock is free under the default config
 });
 
-test('mock planner in the P2 local GitHub loop gives the identical result as the sim planner', () => {
+test('mock planner in the P2 local GitHub loop gives the identical result as the sim planner', async () => {
   const sim = createLocalLoop({ root: tmpDir('p2-sim') });
-  sim.cp.start();
-  const rs = pump(sim);
+  await sim.cp.start();
+  const rs = await pump(sim);
 
   const loop = createLocalLoop({
     root: tmpDir('p2-mock'),
     makePlanner: ({ repo, controlDir }) => agents(controlDir, { plannerResponder: simPlannerResponder({ repo }) }).planner,
   });
-  loop.cp.start();
-  const rm = pump(loop);
+  await loop.cp.start();
+  const rm = await pump(loop);
 
   assert.equal(rm.state.status, 'COMPLETE');
   assert.equal(rm.state.last_verified_sha, rs.state.last_verified_sha);
@@ -145,13 +145,13 @@ test('mock planner in the P2 local GitHub loop gives the identical result as the
 });
 
 // ---- 2. spend / rate controls (fail closed, before the call) -------------------------------------------
-test('max_calls_per_task: the worker budget blocks the next call BEFORE it is made -> BLOCKED + escalation', () => {
+test('max_calls_per_task: the worker budget blocks the next call BEFORE it is made -> BLOCKED + escalation', async () => {
   const { cp, wClient } = cpWith('max-calls', {
     limits: limitsWith({ max_calls_per_task: { planner: 5, worker: 2 } }),
     script: { 'CO-SIM-001': ['FAIL', 'FAIL', 'FAIL', 'FAIL'] },
   });
-  cp.start();
-  const r = cp.run();
+  await cp.start();
+  const r = await cp.run();
   assert.equal(r.state.status, 'BLOCKED');
   assert.equal(wClient.calls.length, 2); // the 3rd worker call was never made
   assert.equal(r.state.failure_count, 2); // stopped by the budget, before the breaker's 3rd failure
@@ -159,16 +159,16 @@ test('max_calls_per_task: the worker budget blocks the next call BEFORE it is ma
   assert.equal(e.kind, 'spend_guard');
   assert.equal(e.code, 'MAX_CALLS_PER_TASK');
   assert.match(r.state.next_safe_action, /^NEEDS_HUMAN: worker halted \(MAX_CALLS_PER_TASK\)/);
-  assert.equal(cp.run().stopped, 'blocked'); // stays stopped
+  assert.equal((await cp.run()).stopped, 'blocked'); // stays stopped
   assert.equal(wClient.calls.length, 2);
 });
 
-test('daily_spend_cap: blocks the call that would exceed the cap; spend never passes the cap', () => {
+test('daily_spend_cap: blocks the call that would exceed the cap; spend never passes the cap', async () => {
   // input priced so that estimates equal actual cost: 100 USD per million input tokens.
   const limits = limitsWith({ daily_spend_cap_usd: 0.05, per_call_max_usd: 1, pricing_usd_per_mtok: { 'mock/mock-1': { input: 100, output: 0 } } });
   const { cp, dir, pClient, wClient } = cpWith('daily-cap', { limits });
-  cp.start();
-  const r = cp.run();
+  await cp.start();
+  const r = await cp.run();
   assert.equal(r.state.status, 'BLOCKED');
   const e = escalation(cp);
   assert.equal(e.code, 'DAILY_SPEND_CAP');
@@ -178,7 +178,7 @@ test('daily_spend_cap: blocks the call that would exceed the cap; spend never pa
   assert.equal(pClient.calls.length + wClient.calls.length, permitted); // the blocked call was not made
 });
 
-test('daily_spend_cap: the ledger persists across processes and resets the next day', () => {
+test('daily_spend_cap: the ledger persists across processes and resets the next day', async () => {
   const dir = tmpDir('ledger');
   const limits = limitsWith({ daily_spend_cap_usd: 0.01, per_call_max_usd: 1, pricing_usd_per_mtok: { 'mock/mock-1': { input: 0, output: 1000 } } });
   const call = { role: 'worker', key: 'T-1', provider: 'mock', model: 'mock-1', input_tokens: 0, max_output_tokens: 5 }; // 0.005 USD
@@ -194,7 +194,7 @@ test('daily_spend_cap: the ledger persists across processes and resets the next 
   assert.equal(g2.check({ ...call, key: 'T-3' }).call_no, 1); // new day: cap resets
 });
 
-test('per-call cap, unpriced model and real providers are refused before any call (fail closed)', () => {
+test('per-call cap, unpriced model and real providers are refused before any call (fail closed)', async () => {
   const dir = tmpDir('refuse');
   const call = { role: 'planner', key: 'k', input_tokens: 10, max_output_tokens: 10 };
   const g = (limits) => new SpendGuard({ limits, ledgerPath: path.join(dir, `${Math.random()}.json`) });
@@ -209,18 +209,18 @@ test('per-call cap, unpriced model and real providers are refused before any cal
   // Through the control plane: a planner on an unpriced/real model never gets called; loop BLOCKED.
   const client = new MockModelClient({ responder: simPlannerResponder(), provider: 'openai', model: 'gpt-anything' });
   const { cp } = cpWith('refuse-cp', { plannerClient: client });
-  cp.start();
-  assert.equal(cp.run().state.status, 'BLOCKED');
+  await cp.start();
+  assert.equal((await cp.run()).state.status, 'BLOCKED');
   assert.equal(client.calls.length, 0);
   assert.equal(escalation(cp).code, 'REAL_AGENTS_DISABLED');
   assert.equal(escalation(cp).escalation_id.startsWith('planner.spend.'), true);
 });
 
 // ---- 3. loop detector -----------------------------------------------------------------------------
-test('loop detector: identical worker output for the same task trips the circuit breaker', () => {
+test('loop detector: identical worker output for the same task trips the circuit breaker', async () => {
   const { cp, wClient } = cpWith('loop', { script: { 'CO-SIM-001': ['FAIL', 'FAIL', 'FAIL'] }, repeat: true });
-  cp.start();
-  const r = cp.run();
+  await cp.start();
+  const r = await cp.run();
   assert.equal(r.state.status, 'BLOCKED');
   assert.equal(wClient.calls.length, 2); // stopped at the first repeat, not after 3 failures
   assert.ok(r.state.failure_count >= 3, 'breaker count raised to the threshold');
@@ -230,15 +230,15 @@ test('loop detector: identical worker output for the same task trips the circuit
   assert.ok(transitions(cp).includes('WAITING_EVENT->BLOCKED'));
 });
 
-test('loop detector: different outputs on retry are not a loop (normal FAIL -> retry -> PASS)', () => {
+test('loop detector: different outputs on retry are not a loop (normal FAIL -> retry -> PASS)', async () => {
   const { cp, wClient } = cpWith('no-loop', { script: { 'CO-SIM-001': ['FAIL', 'PASS'] } });
-  cp.start();
-  assert.equal(cp.run().state.status, 'COMPLETE');
+  await cp.start();
+  assert.equal((await cp.run()).state.status, 'COMPLETE');
   assert.equal(wClient.calls.length, 3);
 });
 
 // ---- 4. config ------------------------------------------------------------------------------------
-test('config: defaults are conservative and frozen; invalid or "real" configs are refused', () => {
+test('config: defaults are conservative and frozen; invalid or "real" configs are refused', async () => {
   assert.equal(DEFAULTS.mode, 'mock');
   assert.equal(DEFAULTS.daily_spend_cap_usd, 0);
   assert.equal(DEFAULTS.per_call_max_usd, 0);
@@ -260,16 +260,16 @@ test('config: defaults are conservative and frozen; invalid or "real" configs ar
 });
 
 // ---- untrusted model output ---------------------------------------------------------------------------
-test('untrusted output: malformed planner/worker output fails closed; review needs an exact ACCEPT', () => {
+test('untrusted output: malformed planner/worker output fails closed; review needs an exact ACCEPT', async () => {
   const p = cpWith('bad-plan', { plannerResponder: () => 'Sure! Here is the plan: {"task": ...}' });
-  p.cp.start();
-  assert.equal(p.cp.run().state.status, 'BLOCKED');
+  await p.cp.start();
+  assert.equal((await p.cp.run()).state.status, 'BLOCKED');
   assert.equal(escalation(p.cp).kind, 'agent_output');
   assert.equal(p.wClient.calls.length, 0);
 
   const w = cpWith('bad-work', { workerResponder: (req) => JSON.stringify({ ...JSON.parse(scriptedWorkerResponder()(req)), task_id: 'OTHER-1' }) });
-  w.cp.start();
-  assert.equal(w.cp.run().state.status, 'BLOCKED');
+  await w.cp.start();
+  assert.equal((await w.cp.run()).state.status, 'BLOCKED');
   assert.match(escalation(w.cp).reason, /different task/);
 
   // Near-miss verdicts never accept: each review counts as a failure until the breaker trips.
@@ -277,30 +277,30 @@ test('untrusted output: malformed planner/worker output fails closed; review nee
   for (const verdict of ['ACCEPT ', 'accept', 'ACCEPTED']) {
     const responder = (req) => JSON.stringify(req.purpose === 'plan' ? { task: sim.nextTask(req.input) } : { verdict });
     const loop = createLocalLoop({ root: tmpDir('review'), makePlanner: ({ controlDir }) => agents(controlDir, { plannerResponder: responder }).planner });
-    loop.cp.start();
-    const r = pump(loop);
+    await loop.cp.start();
+    const r = await pump(loop);
     assert.equal(r.state.status, 'BLOCKED', verdict);
     assert.deepEqual(r.state.completed_tasks, [], verdict);
     assert.equal(escalation(loop.cp).kind, 'circuit_breaker', verdict);
   }
 });
 
-test('untrusted output: a planned "deploy" still stops at the approval gate whatever the model says', () => {
+test('untrusted output: a planned "deploy" still stops at the approval gate whatever the model says', async () => {
   const sim = new SimPlanner({ plan: [{ task_id: 'CO-SIM-009', action: 'deploy', objective: 'gated' }] });
   const { cp, wClient } = cpWith('gate', {
     plannerResponder: (req) => JSON.stringify(req.purpose === 'plan'
       ? { task: { ...sim.nextTask(req.input), requires_approval: false, approved: true }, approval: 'granted' }
       : { verdict: 'ACCEPT' }),
   });
-  cp.start();
-  assert.equal(cp.run().state.status, 'WAITING_APPROVAL');
+  await cp.start();
+  assert.equal((await cp.run()).state.status, 'WAITING_APPROVAL');
   assert.equal(wClient.calls.length, 0);
 });
 
-test('ledger records usage, cost and hashes only, never prompts or outputs', () => {
+test('ledger records usage, cost and hashes only, never prompts or outputs', async () => {
   const { cp, dir } = cpWith('ledger-privacy');
-  cp.start();
-  cp.run();
+  await cp.start();
+  await cp.run();
   const raw = fs.readFileSync(path.join(dir, 'spend', 'ledger.json'), 'utf8');
   assert.ok(!raw.includes(PLANNER_SYSTEM.slice(0, 30)));
   assert.ok(!raw.includes('Add greeting module'));

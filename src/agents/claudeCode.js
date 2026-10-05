@@ -2,7 +2,7 @@
 
 // Worker client for Claude Code headless (spec D2): `claude -p --output-format json`.
 // It builds the invocation and hands it to an INJECTED runner
-//   runner({ command, argv, stdin, meta }) -> { exit_code, stdout, stderr }   (synchronous)
+//   runner({ command, argv, stdin, meta }) -> Promise<{ exit_code, stdout, stderr }>
 // so this module never starts a process, never reads an environment variable and never sees a key.
 // In Lot 2 the runner replays documented-format fixtures (src/agents/replay.js, .replay = true);
 // running the real `claude` is forbidden until Lot 3 (one live file, explicitly exempted).
@@ -14,6 +14,19 @@
 //   stdout not JSON / not a result object -> halt BAD_RESPONSE (reservation kept)
 //   runner timeout             -> halt WORKER_TIMEOUT (no retry: a worker run is expensive and stateful)
 // Pre-call estimate: the per-call cap (worst case), because the cost is only known after the run.
+//
+// Flags verified 2026-10-05 against `claude --help` of Claude Code 2.1.286 (only --version/--help
+// were run; no model call). Every flag below appears in that help text:
+//   -p / --print                 non-interactive; required by --output-format and --max-budget-usd
+//   --bare                       minimal mode: auth strictly ANTHROPIC_API_KEY (no OAuth/keychain), no
+//                                hooks/plugins, no CLAUDE.md auto-discovery (less untrusted input)
+//   --output-format json         single JSON result
+//   --max-budget-usd <amount>    hard dollar cap for the run = per_call_max_usd (what the guard reserves)
+//   --permission-prompts none    anything that would prompt is denied automatically
+//   --allowedTools <tools...>    "Comma or space-separated list of tool names to allow"; we pass one
+//                                comma-separated argument because tool patterns contain spaces
+//   --append-system-prompt <p>   our worker system prompt
+// --max-turns is NOT in 2.1.286's help, so it is not used (an unknown flag could fail the run).
 const { AgentOutputError, AgentTransportError } = require('./errors');
 const { isPlainObject } = require('../events');
 
@@ -31,8 +44,8 @@ class ClaudeCodeHeadlessClient {
     const cc = this.limits.claude_code;
     return {
       command: 'claude',
-      argv: ['-p', '--output-format', 'json', '--max-turns', String(cc.max_turns),
-        '--allowedTools', cc.allowed_tools.join(','), '--append-system-prompt', request.system],
+      argv: ['-p', '--bare', '--output-format', 'json', '--max-budget-usd', String(this.limits.per_call_max_usd),
+        '--permission-prompts', 'none', '--allowedTools', cc.allowed_tools.join(','), '--append-system-prompt', request.system],
       stdin: `${WORKER_INSTRUCTIONS}\n\nHANDOFF:\n${JSON.stringify(request.input.handoff, null, 2)}\n`,
       meta: { task_id: request.input.handoff.task_id, purpose: request.purpose, key: request.key },
     };
@@ -42,10 +55,10 @@ class ClaudeCodeHeadlessClient {
     return { estimate_usd: this.limits.per_call_max_usd };
   }
 
-  complete(request) {
+  async complete(request) {
     let out;
     try {
-      out = this.runner(this.buildInvocation(request));
+      out = await this.runner(this.buildInvocation(request));
     } catch (err) {
       if (err.code === 'ETIMEDOUT') throw new AgentTransportError('WORKER_TIMEOUT', 'claude-code: worker run timed out');
       throw new AgentTransportError('TRANSPORT_ERROR', `claude-code: runner failed: ${err.code || err.message}`);

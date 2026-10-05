@@ -28,10 +28,25 @@ only that one. The worker key is never available there.
   not repository-wide secrets, never go in code or files, and are never in `orchestra-state`.
   Each job can read only the key it needs.
 - Settings for both environments:
-  - **Deployment branches: `main` only.** Jobs from other branches cannot read the keys.
-  - **Required reviewer: the Product Owner**, for the first supervised Lot 3 runs. Each agent job
-    waits for an explicit click. Removing the reviewer later (for the autonomous loop) is its own
-    approval decision.
+  - **Deployment branches: `main` only.** This matches the branch the jobs actually run on.
+    GitHub checks an environment's branch rule against the run's `github.ref`, not against
+    whatever a job later checks out.
+    - The orchestrator is triggered by `workflow_run`. That event only runs the workflow file on
+      the **default branch** (`main`), with `github.ref = refs/heads/main`.
+    - The worker workflow (Lot 3) is triggered by `repository_dispatch`, which also only runs the
+      workflow file on the default branch, with `github.ref` = `main`. The worker then *checks
+      out* `co/<task_id>` to work on. That does not change `github.ref`, so the `main` rule
+      still matches.
+    - No agent workflow may use `workflow_dispatch`, `push` or `pull_request` triggers. Those
+      can run on other refs, and the `main`-only rule would (correctly) deny them the keys.
+  - **Required reviewer: the Product Owner, ACTIVE throughout Lot 3 (supervised).**
+    - **Each** job that uses `agents-planner` or `agents-worker` pauses until you click
+      *Approve* in GitHub. This **stops the automation by design**: no model call happens without
+      your click, so the loop is no longer "no human continue" while the gate is on.
+    - Removing the reviewer, to let the Review-Dispatch Loop run on its own, is a **separate, later
+      decision by Ási**. It is not part of Lot 3.
+    - While a job waits for approval it holds its place in the `clubOrchestra` concurrency
+      group (see §4a, "pending runs").
 - Only the orchestrator `ingest` job declares `environment: agents-planner`, and only the worker job
   declares `environment: agents-worker`. CI jobs and anything triggered by a pull request never
   declare either environment.
@@ -73,11 +88,13 @@ only that one. The worker key is never available there.
   environment). It is the only place allowed `fetch`/`child_process`/`process.env`, and only for
   those two key names. The exemption names that one path, and the offline test keeps checking
   every other file.
-- **Lot 3 design point (needs a decision):** the control plane and adapters are synchronous, while
-  real `fetch` is asynchronous. Recommendation: keep the verified control plane unchanged and give
-  `live.js` a synchronous bridge (a worker thread + `Atomics.wait`, or `spawnSync` of a small
-  helper). The alternative is to make the whole agent call path async, which touches verified
-  P1/P2 code.
+- **Async call path (decided and done in Lot 2b):**
+  - The control plane, the adapters and the clients are `async`, so the live transport can be a
+    plain `await fetch(...)` and the live runner a plain child process, with no bridge.
+  - The first paid run therefore tests exactly one new thing: the live I/O in `src/agents/live.js`.
+  - The worker invocation uses only flags verified against `claude --help` 2.1.286
+    (`src/agents/claudeCode.js`), including `--bare`: auth strictly from `ANTHROPIC_API_KEY`, no
+    OAuth or keychain.
 
 ## 4a. Spend ledger: where it lives, concurrency, the day (P3 Lot 2 Q1/Q3)
 - **Location:** `<state dir>/spend/ledger.json`. On GitHub that is `state/data/spend/ledger.json` on
@@ -98,7 +115,18 @@ only that one. The worker key is never available there.
     commits the ledger in the same push as the state.
   - **Residual risk:** if that push is rejected (optimistic lock lost), the run's ledger bookings
     are lost with it. Serialisation prevents this. Lot 3 must also treat a rejected state push
-    after a model call as an alert, not a silent retry.
+    after a model call as an alert, not a silent retry. **This is why provider-side budgets are
+    MANDATORY in Lot 3 (§6):** they are the only cap that holds even if our ledger under-counts.
+  - **Pending runs (finding, Lot 2b):** GitHub keeps at most **one pending** run per concurrency
+    group. A newer queued run **cancels** the older pending one.
+    - Today `concurrency` is set at workflow level in `orchestrator.yml`, so PR-CI-triggered
+      orchestrator runs also enter the group, even though their job is then skipped. They can cancel
+      a pending real ingest run.
+    - So can a long reviewer wait in Lot 3 (approval held while other CI runs complete).
+    - A cancelled run means a lost `workflow_run` event: no double spend, but the loop stalls
+      until reconcile or a re-run.
+    - **Recommendation for Lot 3, not changed here:** move `concurrency` to the `ingest` job
+      (skipped jobs then never enter the group), and add the planned watchdog (reconcile on stall).
 - **The day is UTC.** `spent_usd_today` resets at 00:00 UTC, computed from the clock as
   `new Date(now).toISOString()`, whatever offset the clock reports. Tested at the boundary and with
   ±02:00 offsets. Call budgets (`max_calls_per_task`) never reset.
@@ -128,11 +156,15 @@ example). This is intentional, not a counting error:
 
 ## 6. Product Owner checklist for Lot 3 (nothing done yet)
 1. Approve Lot 3 and a spend cap.
-2. Create the dedicated OpenAI project and Anthropic workspace, set provider-side budgets, and
-   create the two keys.
-3. Create the GitHub environments `agents-planner` (secret `OPENAI_API_KEY`) and `agents-worker`
-   (secret `ANTHROPIC_API_KEY`). Both: branches `main` only, required reviewer: you.
-4. Set real numbers in `config/agent-limits.json` (`_PRODUCT_OWNER_SETS_IN_LOT3`): the real
+2. Create the dedicated OpenAI project and Anthropic workspace and create the two keys.
+3. **MANDATORY: set the provider-side budgets** (OpenAI project budget, Anthropic workspace spend
+   limit), at or below `daily_spend_cap_usd` × 30. Lot 3 does not start without them. They are
+   the only cap that still holds if our ledger under-counts (§4a residual risk).
+4. Create the GitHub environments `agents-planner` (secret `OPENAI_API_KEY`) and `agents-worker`
+   (secret `ANTHROPIC_API_KEY`). Both: branches `main` only, required reviewer: you (stays on
+   for all of Lot 3; removing it is a later decision).
+5. Set real numbers in `config/agent-limits.json` (`_PRODUCT_OWNER_SETS_IN_LOT3`): the real
    prices for the models you choose, the daily cap and the per-call cap. Merge via PR.
-5. Decide the sync-bridge question for `src/agents/live.js` (§4).
-6. First supervised run: one task, with the reviewer gate on.
+6. Approve one exempt file, `src/agents/live.js` (live transport + `claude` runner). The call path
+   is already async (Lot 2b), so it needs no bridge.
+7. First supervised run: one task, with the reviewer gate on.

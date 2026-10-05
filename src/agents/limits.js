@@ -35,10 +35,10 @@ function validateLimits(l) {
   if (!t || !nonNegative(t.max_retry_after_s) || t.max_retry_after_s > 300) errors.push('transport.max_retry_after_s must be 0..300');
   if (!t || !nonNegative(t.backoff_ms) || t.backoff_ms > 60000) errors.push('transport.backoff_ms must be 0..60000');
   const cc = l.claude_code;
-  if (!cc || !posInt(cc.max_turns) || cc.max_turns > 50) errors.push('claude_code.max_turns must be an integer 1..50');
-  if (!cc || !Array.isArray(cc.allowed_tools) || cc.allowed_tools.length === 0 || !cc.allowed_tools.every((x) => typeof x === 'string' && x.length > 0)) {
-    errors.push('claude_code.allowed_tools must be a non-empty list of tool names');
+  if (!cc || !Array.isArray(cc.allowed_tools) || cc.allowed_tools.length === 0 || !cc.allowed_tools.every((x) => typeof x === 'string' && x.length > 0 && !x.includes(','))) {
+    errors.push('claude_code.allowed_tools must be a non-empty list of tool names (no commas: the list is passed comma-separated)');
   }
+  if (cc && Object.keys(cc).some((k) => k !== 'allowed_tools')) errors.push('claude_code accepts only allowed_tools (the run budget is per_call_max_usd)');
 
   // Prices: { input, output } USD per million tokens, or { reported_cost: true } for an agent that
   // reports its own cost (Claude Code headless: total_cost_usd). A model without an entry is refused.

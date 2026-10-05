@@ -23,7 +23,7 @@ function thrown(code) {
 
 function makeReplayTransport(routes) {
   const queues = queueFrom(routes);
-  const transport = (url, init) => {
+  const transport = async (url, init) => {
     const body = JSON.parse(init.body);
     const key = body.metadata && body.metadata.co_key;
     transport.requests.push({ url, method: init.method, headers: { ...init.headers }, body });
@@ -41,7 +41,7 @@ function makeReplayTransport(routes) {
 
 function makeReplayRunner(routes) {
   const queues = queueFrom(routes);
-  const runner = (invocation) => {
+  const runner = async (invocation) => {
     const key = invocation.meta.task_id;
     runner.invocations.push(invocation);
     const queue = queues[key];
