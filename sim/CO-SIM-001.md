@@ -1,3 +1,4 @@
-# CO-SIM-001 stale-SHA probe
+# CO-SIM-001
 
-Decoy commit. Its CI result must be logged stale (not the pending sha) and do no work.
+Simulated worker result for the first real GitHub loop (P2b E2E).
+No real agent was used.
