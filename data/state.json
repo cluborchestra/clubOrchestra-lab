@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "version": 3,
+  "version": 4,
   "project_id": "clubOrchestra-lab",
   "status": "WAITING_EVENT",
   "current_task_id": "CO-SIM-001",
@@ -47,9 +47,9 @@
   "branch": "main",
   "expected_sha": "1597f1b55ebb77f5e2f72be4928f565d52320952",
   "last_verified_sha": "1597f1b55ebb77f5e2f72be4928f565d52320952",
-  "last_event_id": "evt-worker-CO-SIM-001-d59516afd4ea",
+  "last_event_id": "gh-run-37357864409-1",
   "failure_count": 0,
   "next_safe_action": "await ci.completed for d59516afd4ea199bf3f7232772eda3d5b88950b9",
   "completed_tasks": [],
-  "inbox_cursor": 1
+  "inbox_cursor": 2
 }
