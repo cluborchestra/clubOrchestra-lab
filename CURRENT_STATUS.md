@@ -1,11 +1,11 @@
 # CURRENT_STATUS — clubOrchestra-lab
 
-**Updated:** 2026-10-04 · **Tasks:** CO-P1-001, CO-P2a-001, CO-P2b-001 · **Phase:** P2b (GitHub wiring; no real run yet)
+**Updated:** 2026-10-05 · **Tasks:** CO-P1-001, CO-P2a-001, CO-P2b-001 · **Phase:** P2b done (core loop live on GitHub, simulated worker)
 Tags: PLANNED / IMPLEMENTED / TESTED / E2E_VERIFIED / DISABLED (spec §8).
 TESTED = covered by an automated test in `test/` that passes with `npm test`.
 
-**P1 control plane: IMPLEMENTED + TESTED (local) — NOT E2E_VERIFIED.** QA accepted CO-P1-001
-on 2026-10-04 (local only; no remote, CI or PR yet — repo creation is OWNER_APPROVAL_REQUIRED).
+**P1 control plane: IMPLEMENTED + TESTED.** QA accepted CO-P1-001 on 2026-10-04. Its tests also
+pass on GitHub Actions (CI run 37355805656), and the live P2b run below used it end to end.
 
 | # | Capability | Status | Where | Proof |
 |---|---|---|---|---|
@@ -40,35 +40,63 @@ on 2026-10-04 (local only; no remote, CI or PR yet — repo creation is OWNER_AP
 | 7 | Full suite green (now 55: P1 31 + P2a 19 + P2b 5) | TESTED | — | `npm test` |
 | 8 | Offline: no network modules; harness spawns only local `git` | TESTED | — | `offline: …` ×2 |
 
-## P2b — GitHub wiring (CO-P2b-001)
+## P2b — GitHub wiring + first live run (CO-P2b-001)
 
-Repo: https://github.com/cluborchestra/clubOrchestra-lab (public, approved by Product Owner).
-**P2b: IMPLEMENTED + TESTED (local) — NOT E2E_VERIFIED.** No Actions run has happened.
+Repo: https://github.com/cluborchestra/clubOrchestra-lab (public). `main` = `1597f1b`, the merge of
+PR #1. It was a merge commit, so the P1/P2a/P2b SHAs are preserved. `main` is protected.
+`ORCHESTRATOR_ENABLED=true`.
 
+### Core loop on real GitHub: E2E_VERIFIED (2026-10-05)
+One task (`CO-SIM-001`), simulated worker, no API keys, no cost. The run was:
+
+- push to `co/`
+- CI (`push`)
+- `workflow_run`
+- orchestrator
+- exact-SHA + branch-head gate
+- planner review
+- task complete
+- next task dispatched
+- state committed to `orchestra-state` by the workflow
+
+No human "continue" anywhere in that chain. Full evidence:
+[docs/evidence/p2b_live_run.md](docs/evidence/p2b_live_run.md).
+
+| Proof | Status | Evidence |
+|---|---|---|
+| Stale-SHA CI result → no work (logged `event_stale`) | **E2E_VERIFIED** | CI 37357864409 → orchestrator 37357891383 → state `88bd4aa` |
+| CI on the exact pending sha → CO-SIM-001 complete, CO-SIM-002 dispatched to `outbox/`, state committed by the workflow | **E2E_VERIFIED** | CI 37358003409 → orchestrator 37358037144 (attempt 1) → state `66cee56` |
+| Duplicate delivery of the same `workflow_run` → no-op | **VERIFIED (dry-run)**; live re-run **DEFERRED** | Same `ingest` command on a copy of the live state gives `duplicate_event_ignored`; also unit/harness tests. The live re-run of orchestrator **37358037144** failed twice (attempts 2 and 3) during a **GitHub Actions hosted-runner incident** ("job was not acquired by Runner of type hosted" / "Internal server error"). The job never started, and nothing was written. |
+
+**To finish later:** on run **37358037144**, click **Re-run all jobs**. Expected: one new state commit
+with a single `duplicate_event_ignored` for `gh-run-37358003409-1`, `version` 6→7,
+`inbox_cursor` 3→4, nothing else changed.
+
+**Scope note:** this run proves on real GitHub the core loop mechanism that spec P4 builds on. Spec P4
+itself (≥2 tasks in a row, starting from a goal, with real agents) is still PLANNED, because it needs
+P3 (real agents) first.
+
+### Wiring
 | Item | Status | Where / proof |
 |---|---|---|
-| Remote added; `main` = P1 (`4b935cc`); feature branches + `orchestra-state` pushed | IMPLEMENTED | git remote `origin` |
 | Adapter ignores CI from non-`co/` branches (PR CI can't block the loop) | TESTED | `src/adapters/github.js`; `test/p2b-github-wiring.test.js` |
-| Orchestrator wired to the state-branch pattern (`orchestra-state`, never pushes to `main`) | TESTED (static) | `.github/workflows/orchestrator.yml`; `orchestrator: state-branch pattern …` |
-| Orchestrator DISABLED: job gated on `vars.ORCHESTRATOR_ENABLED == 'true'` + push-CI + own repo | TESTED (static) | `orchestrator: disabled unless …` |
-| Actions pinned to commit SHAs (checkout v4.4.0, setup-node v4.4.0) | TESTED (static) | `workflows: actions pinned …` |
-| `data/` removed from code branches; state only on `orchestra-state` | IMPLEMENTED | `.gitignore`, branch `orchestra-state` |
-| `main` set as default + branch protection | OWNER (GitHub UI) | settings checklist in the PR description |
-| P2b PR into `main` | OWNER (GitHub UI) | no authenticated GitHub API/CLI on this machine |
-| First real run (set `ORCHESTRATOR_ENABLED=true`, push a `co/` branch) | OWNER_APPROVAL_REQUIRED | → E2E_VERIFIED only after it runs |
-| Wire dispatch: `outbox/<task>.json` → `repository_dispatch` → worker workflow | PLANNED | after first real run |
-| Watchdog `schedule` workflow (stall → reconcile, never a 2nd writer) | PLANNED | after first real run |
+| Orchestrator on the state-branch pattern (`orchestra-state`, never pushes to `main`) | E2E_VERIFIED | 2 state commits pushed by the workflow; `main` untouched |
+| Orchestrator gate: `vars.ORCHESTRATOR_ENABLED == 'true'` + push-CI + own repo | TESTED (static) | `orchestrator: disabled unless …` |
+| Actions pinned to commit SHAs (checkout v4.4.0, setup-node v4.4.0) | E2E_VERIFIED | all live runs resolved them |
+| `data/` only on `orchestra-state` | IMPLEMENTED | `.gitignore`, branch `orchestra-state` |
+| `orchestra-state` intact after the failed re-runs | VERIFIED | tip `66cee56`, v6, files consistent, no lock/tmp files, 0 runs queued/in progress |
+| Wire dispatch: `outbox/<task>.json` → `repository_dispatch` → worker workflow | PLANNED | P3 territory |
+| Watchdog `schedule` workflow (stall → reconcile, never a 2nd writer) | PLANNED | — |
+| Required status check `test` on `main` | OWNER (GitHub UI) | optional hardening |
 
-Nothing is E2E_VERIFIED yet.
+**Current live state:** `WAITING_EVENT`, waiting for the worker on `CO-SIM-002` (written to `outbox/`;
+nothing executes it). This is the accepted stopping point.
 
 ## Known limitations
 
 - `state.lock` + `version` is the local lock. On GitHub, `orchestrator.yml` adds Actions
-  `concurrency` and a non-forced push to `orchestra-state` (rejected if that branch moved). This
-  is authored but not yet exercised.
-- `orchestra-state` starts from the generic scaffold (`last_verified_sha` = 40 zeros, `branch: main`).
-  Before the first real run it must be initialised with the real `main` sha; that is part of the
-  first-run approval.
+  `concurrency` and a non-forced push to `orchestra-state` (rejected if that branch moved). Both
+  were used in the live run. A race between two orchestrator runs has not been provoked live.
 - `processed_events.json` is written right after `state.json` under the same lease. A crash between
   the two can let an event be re-read; it is then stale (no longer the current task) and ignored.
 - The sim worker keeps its attempt counter in memory. Across separate CLI invocations a retried
@@ -87,3 +115,7 @@ Nothing is E2E_VERIFIED yet.
   but before the worker started, the task waits (`no_commit_yet`) until the P2b watchdog or a
   human re-dispatches it.
 - P2a tests and the harness need the local `git` binary (offline; system/global config disabled).
+- CO-SIM-002's handoff in `outbox/` says `"repo": "clubOrchestra-lab"` rather than
+  `cluborchestra/clubOrchestra-lab`: the `ingest` CLI creates the sim planner without the full repo
+  name. Cosmetic; fix in a later PR.
+- Unauthenticated GitHub API checks are limited to 60 requests/hour; poll sparingly.
