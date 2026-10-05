@@ -94,7 +94,14 @@ Nettilgildra er virk í hverju prófaferli. Í `src/` er hvorki `process.env`, `
 `child_process`.
 
 ## Push og staðfesting
-_(fyllt út eftir push, sjá neðst)_
+- `git push -u origin feat/co-p3-lot2b-async`: **nýr remote-haus `8e45317`**, auðkenni
+  `cluborchestra` og noreply-netfang. Greinin inniheldur einnig Lot 1 (`69b29df`) og Lot 2
+  (`1dee952`) undir sér, og docs-commit `2c363ae`.
+- **Engin Actions-keyrsla ræstist.** Heildarfjöldi keyrslna var 5 fyrir push og 5 mínútu eftir.
+  Ástæðan, eins og próf 11 sýnir: CI keyrir aðeins á push í `co/**`, og orchestrator aðeins eftir
+  CI.
+- **Óbreytt á remote:** `main` = `1597f1b`, `orchestra-state` = `66cee56`,
+  `co/CO-SIM-001` = `d59516a`. Engin ný `co/` grein.
 
 ## Áhætta og niðurstöður sem Ási ætti að vita
 1. **Issue-skrefið hefur ekki keyrt á GitHub enn.** Það er prófað statískt og verður virkt þegar
