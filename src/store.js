@@ -19,6 +19,8 @@ function initialState({ project_id, repo, branch, base_sha }) {
     current_task_id: null,
     current_task: null,
     current_owner: null,
+    awaiting: null, // 'worker' | 'ci' while WAITING_EVENT
+    pending_ci_sha: null,
     lease_until: null,
     repo,
     branch,

@@ -1,0 +1,72 @@
+# Orchestrator: delivers each completed CI run on a task branch (co/<task_id>) to the control plane.
+#
+# DISABLED BY DEFAULT. The job runs only if the repository variable ORCHESTRATOR_ENABLED is exactly
+# "true" (Settings -> Secrets and variables -> Actions -> Variables). Setting it is the Product Owner's
+# explicit "go" for real runs. Until then every trigger ends with the job skipped.
+#
+# State lives on the orphan branch `orchestra-state` (only data/: state.json, inbox, audit, approvals).
+# It is never merged into main, and this workflow never pushes to main.
+#
+# Per spec D1 the control plane is GitHub-native, so "POST the event to the control plane"
+# = run `node src/cli.js ingest` on the event file, then push the new state to orchestra-state.
+#
+# Single writer:
+#   1. `concurrency` below: one orchestrator run at a time; queued runs are not cancelled.
+#   2. optimistic lock: the state push is a plain (non-forced) push on top of the state commit we
+#      checked out. If anything else moved orchestra-state, the push is rejected and the run fails
+#      without writing; a re-run re-reads the state.
+#
+# Untrusted input: the webhook payload is read only from $GITHUB_EVENT_PATH by the adapter. No
+# `${{ github.event.* }}` expression is interpolated into a shell command (script injection).
+# workflow_run workflows always run the version of this file on the default branch (main).
+name: Orchestrator
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+concurrency:
+  group: clubOrchestra
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push data/ to orchestra-state; main is protected and never pushed to
+
+jobs:
+  ingest:
+    if: >-
+      vars.ORCHESTRATOR_ENABLED == 'true' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out control-plane code (main)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+      - name: Check out state (orchestra-state)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: orchestra-state
+          path: state
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Fetch task branch heads (exact-SHA gate reads them from .git)
+        run: git fetch --no-tags --depth=1 origin '+refs/heads/co/*:refs/heads/co/*'
+      - name: Ingest workflow_run into the control plane
+        env:
+          REPO: ${{ github.repository }}
+        run: node src/cli.js ingest state/data "$GITHUB_EVENT_PATH" --git-dir .git --repo "$REPO"
+      # Later (P2b follow-up): turn state/data/outbox/<task_id>.json into a repository_dispatch to the worker.
+      - name: Push state to orchestra-state (optimistic lock via non-forced push)
+        working-directory: state
+        run: |
+          git config user.name "clubOrchestra"
+          git config user.email "337842026+cluborchestra@users.noreply.github.com"
+          git add data
+          git diff --cached --quiet && exit 0
+          git commit -m "orchestrator: ingest workflow_run ${GITHUB_RUN_ID}"
+          git push origin HEAD:orchestra-state

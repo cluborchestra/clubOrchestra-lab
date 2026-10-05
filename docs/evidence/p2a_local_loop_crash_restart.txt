@@ -1,0 +1,73 @@
+!! simulated crash after commit c8b31c78f4471b7fd0c1a4f23b52dac47b2d2d9a -- restarting control plane from durable state
+--- sample workflow_run payload (simulated GitHub delivery) ---
+{
+  "action": "completed",
+  "workflow_run": {
+    "id": 7001,
+    "run_attempt": 1,
+    "name": "CI",
+    "head_branch": "co/CO-SIM-001",
+    "head_sha": "c8b31c78f4471b7fd0c1a4f23b52dac47b2d2d9a",
+    "status": "completed",
+    "conclusion": "success",
+    "updated_at": "2026-10-04T12:00:04.000Z"
+  },
+  "repository": {
+    "full_name": "local/clubOrchestra-lab"
+  }
+}
+--- derived P1 event envelope ---
+{
+  "schema_version": 1,
+  "event_id": "gh-run-7001-1",
+  "type": "ci.completed",
+  "created_at": "2026-10-04T12:00:04.000Z",
+  "producer": "github",
+  "project_id": "clubOrchestra-lab",
+  "repo": "local/clubOrchestra-lab",
+  "branch": "co/CO-SIM-001",
+  "sha": "c8b31c78f4471b7fd0c1a4f23b52dac47b2d2d9a",
+  "task_id": "CO-SIM-001",
+  "status": "success",
+  "payload": {
+    "source": "github.workflow_run",
+    "workflow": "CI",
+    "run_id": 7001,
+    "run_attempt": 1,
+    "conclusion": "success"
+  },
+  "evidence_refs": [
+    "github-run:7001/attempt-1"
+  ]
+}
+--- audit trail ---
+2026-10-04T12:00:00.000Z  IDLE -> RUNNING                    task=-  event=-  start
+2026-10-04T12:00:01.000Z  RUNNING -> WAITING_EVENT           task=CO-SIM-001  event=-  dispatched CO-SIM-001 to worker
+2026-10-04T12:00:02.000Z  task_dispatched                    task=CO-SIM-001  event=-  
+2026-10-04T12:00:03.000Z  reconcile                          task=CO-SIM-001  event=-  worker commit found on task branch; awaiting CI on it instead of re-running the task
+2026-10-04T12:00:05.000Z  planner_review                     task=CO-SIM-001  event=gh-run-7001-1  
+2026-10-04T12:00:06.000Z  WAITING_EVENT -> RUNNING           task=CO-SIM-001  event=gh-run-7001-1  CI passed and planner accepted at c8b31c78f4471b7fd0c1a4f23b52dac47b2d2d9a
+2026-10-04T12:00:07.000Z  RUNNING -> WAITING_EVENT           task=CO-SIM-002  event=-  dispatched CO-SIM-002 to worker
+2026-10-04T12:00:08.000Z  task_dispatched                    task=CO-SIM-002  event=-  
+2026-10-04T12:00:10.000Z  duplicate_event_ignored            task=CO-SIM-001  event=gh-run-7001-1  
+2026-10-04T12:00:11.000Z  worker_evidence_accepted           task=CO-SIM-002  event=evt-worker-CO-SIM-002-a7f682e89051  awaiting CI on exact sha
+2026-10-04T12:00:13.000Z  planner_review                     task=CO-SIM-002  event=gh-run-7002-1  
+2026-10-04T12:00:14.000Z  WAITING_EVENT -> RUNNING           task=CO-SIM-002  event=gh-run-7002-1  CI passed and planner accepted at a7f682e89051818ee6acce3879deed2b8dc2afb3
+2026-10-04T12:00:15.000Z  RUNNING -> COMPLETE                task=-  event=-  planner has no further tasks
+--- result ---
+{
+  "status": "COMPLETE",
+  "completed_tasks": [
+    "CO-SIM-001",
+    "CO-SIM-002"
+  ],
+  "last_verified_sha": "a7f682e89051818ee6acce3879deed2b8dc2afb3",
+  "git_head_of_last_task_branch": "a7f682e89051818ee6acce3879deed2b8dc2afb3",
+  "worker_executions": [
+    "CO-SIM-001",
+    "CO-SIM-002"
+  ],
+  "restarted": true,
+  "ci_runs_delivered": 2,
+  "human_continue_used": false
+}

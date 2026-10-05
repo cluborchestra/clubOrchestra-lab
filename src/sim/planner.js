@@ -9,11 +9,21 @@ const DEFAULT_PLAN = Object.freeze([
 ]);
 
 class SimPlanner {
-  constructor({ plan = DEFAULT_PLAN, repo = 'clubOrchestra-lab', extra = {} } = {}) {
+  constructor({ plan = DEFAULT_PLAN, repo = 'clubOrchestra-lab', extra = {}, rejectReviews = [] } = {}) {
     this.plan = plan;
     this.repo = repo;
     this.extra = extra; // lets tests inject arbitrary (untrusted) fields into handoffs
+    this.rejectReviews = rejectReviews; // task_ids whose review the sim planner rejects
     this.calls = 0;
+    this.reviews = [];
+  }
+
+  // Deterministic review of CI evidence (P2). Accepts a successful CI run for a planned task.
+  review(evidence) {
+    this.reviews.push(evidence.task_id);
+    const planned = this.plan.some((t) => t.task_id === evidence.task_id);
+    const ok = planned && evidence.ci_status === 'success' && !this.rejectReviews.includes(evidence.task_id);
+    return { verdict: ok ? 'ACCEPT' : 'REJECT' };
   }
 
   nextTask(view) {

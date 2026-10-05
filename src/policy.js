@@ -9,6 +9,14 @@ const POLICY = Object.freeze({
   allowed_actions: Object.freeze(['implement', 'test', 'docs', 'deploy', 'enable_api_keys', 'spend']),
   // Actions that always require an approved approvals/<id>.json before dispatch.
   approval_required_actions: Object.freeze(['deploy', 'enable_api_keys', 'spend']),
+  // Each task's work lives on branch <prefix><task_id>; CI results map back to tasks by branch.
+  task_branch_prefix: 'co/',
+  // Only workflow_run results from these workflows are turned into events.
+  ci_workflows: Object.freeze(['CI']),
 });
 
-module.exports = { POLICY };
+function taskBranch(taskId) {
+  return `${POLICY.task_branch_prefix}${taskId}`;
+}
+
+module.exports = { POLICY, taskBranch };

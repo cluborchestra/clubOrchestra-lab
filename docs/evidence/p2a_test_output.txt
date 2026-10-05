@@ -1,0 +1,63 @@
+
+> cluborchestra-lab@0.1.0 test
+> node --test "test/*.test.js"
+
+✔ happy path: 2-step loop reaches COMPLETE with no human "continue" (64.5361ms)
+✔ exact-SHA: event with stale starting_sha is ignored (no work, no failure) (98.7461ms)
+✔ exact-SHA: ending_sha that does not match event.sha counts as FAIL (30.9631ms)
+✔ state machine: illegal transition is rejected, logged, and state unchanged (9.9022ms)
+✔ fail closed: event missing "schema_version" -> rejected, BLOCKED/NEEDS_HUMAN, logged (34.2285ms)
+✔ fail closed: event missing "event_id" -> rejected, BLOCKED/NEEDS_HUMAN, logged (16.8234ms)
+✔ fail closed: event missing "type" -> rejected, BLOCKED/NEEDS_HUMAN, logged (18.8832ms)
+✔ fail closed: event missing "created_at" -> rejected, BLOCKED/NEEDS_HUMAN, logged (27.0551ms)
+✔ fail closed: event missing "producer" -> rejected, BLOCKED/NEEDS_HUMAN, logged (18.5703ms)
+✔ fail closed: event missing "project_id" -> rejected, BLOCKED/NEEDS_HUMAN, logged (18.5028ms)
+✔ fail closed: event missing "repo" -> rejected, BLOCKED/NEEDS_HUMAN, logged (17.9458ms)
+✔ fail closed: event missing "branch" -> rejected, BLOCKED/NEEDS_HUMAN, logged (23.9822ms)
+✔ fail closed: event missing "sha" -> rejected, BLOCKED/NEEDS_HUMAN, logged (20.3389ms)
+✔ fail closed: event missing "task_id" -> rejected, BLOCKED/NEEDS_HUMAN, logged (17.2193ms)
+✔ fail closed: event missing "status" -> rejected, BLOCKED/NEEDS_HUMAN, logged (17.8455ms)
+✔ fail closed: unparseable event line -> BLOCKED (14.104ms)
+✔ fail closed: wrong project_id / unknown type -> BLOCKED (33.7193ms)
+✔ fail closed: planner handoff with action outside policy -> BLOCKED (9.949ms)
+✔ idempotency: same event_id delivered twice -> second is a no-op (45.4909ms)
+✔ idempotency: duplicate while still waiting changes nothing but the cursor (33.2824ms)
+✔ circuit breaker: 3 consecutive FAILs -> BLOCKED + escalation, no further retries (50.9603ms)
+✔ circuit breaker: failure_count resets after a PASS (consecutive only) (73.5182ms)
+✔ approval gate: stops at WAITING_APPROVAL until approved, then resumes to COMPLETE (43.139ms)
+✔ approval gate: denied -> BLOCKED; malformed "approved" (no approver) does not count (30.8711ms)
+✔ untrusted: handoff fields cannot bypass the approval gate (46.2073ms)
+✔ untrusted: payload instructions never alter control logic (40.7346ms)
+✔ audit: every transition appended with event_id, task_id, actor, from->to, timestamp (31.5847ms)
+✔ offline: control-plane source imports no network modules and no env secrets (2.344ms)
+✔ adapter: workflow_run -> valid ci.completed envelope (2.2016ms)
+✔ adapter: only an explicit "success" conclusion maps to success (fail closed) (0.3901ms)
+✔ adapter: project_id comes from config; payload cannot set it (0.1708ms)
+✔ adapter: not-ours deliveries are ignored; malformed ones yield an invalid envelope (0.3922ms)
+✔ adapter idempotency: redelivery derives the SAME event_id (runId:runAttempt); re-run attempt is new (0.203ms)
+✔ adapter idempotency: same webhook delivered 3x -> processed once, the rest are no-ops (955.0521ms)
+✔ exact-SHA: CI result for a sha other than the pending one -> no work, logged stale (773.8645ms)
+✔ exact-SHA: branch head moved after the commit -> CI result is stale; reconcile blocks (750.1056ms)
+✔ exact-SHA: CI result arriving before the worker result is stale (not awaiting CI) (487.9805ms)
+✔ CI failure -> FAILED -> retry with a fresh commit -> COMPLETE; 3 CI failures trip the breaker (2051.0904ms)
+✔ planner review REJECT counts as a failure even when CI is green (1052.8488ms)
+✔ reconcile: crash after the worker committed (result lost) -> restart adopts commit, no repeated work (802.8753ms)
+✔ reconcile: crash after CI event was received -> restart processes durable inbox, no re-dispatch (887.7143ms)
+✔ reconcile: awaiting worker with no commit -> waits, never re-dispatches (254.3394ms)
+✔ reconcile: consistent state while awaiting CI is a no-op (473.142ms)
+✔ full local chain: workflow_run -> adapter -> control plane -> review -> next task -> COMPLETE, no "continue" (847.7405ms)
+✔ deterministic: two runs produce identical SHAs and event ids (1525.1136ms)
+✔ cli ingest: workflow_run file -> control plane step -> next task written to outbox (506.5062ms)
+✔ workflow files: authored with concurrency single-writer, least privilege, no secrets, no injection (0.8508ms)
+✔ offline: harness uses no network modules and only spawns the local git binary (0.7886ms)
+✔ single-writer: two writers read same version -> exactly one commits, other must re-read (21.1967ms)
+✔ single-writer: a held, unexpired lease rejects other writers; an expired lease can be taken (10.4076ms)
+✔ single-writer: N concurrent OS processes racing on the same version -> exactly one wins (172.9376ms)
+ℹ tests 51
+ℹ suites 0
+ℹ pass 51
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11506.6679
