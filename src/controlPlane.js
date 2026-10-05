@@ -9,6 +9,7 @@ const { assertPlannerAdapter, assertWorkerAdapter } = require('./agents/adapter'
 const { AgentHaltError } = require('./agents/errors');
 const { decide } = require('./escalation');
 const { OwnerIssueOutbox } = require('./ownerIssues');
+const { protectedChanges, loadProtection } = require('./protectedPaths');
 const ID_RE = /^[A-Za-z0-9._-]{1,100}$/;
 const NEEDS_HUMAN = 'NEEDS_HUMAN';
 
@@ -28,7 +29,7 @@ function approvalIdFor(handoff) {
 // ci.completed event for that exact sha passes, the branch head (read from `repo`) still equals
 // that sha, and the planner's review accepts it.
 class ControlPlane {
-  constructor({ dir, planner, worker, actor = 'control-plane', breakerThreshold = POLICY.breaker_threshold, now = () => new Date().toISOString(), leaseMs, requireCi = false, repo = null, notifier = null } = {}) {
+  constructor({ dir, planner, worker, actor = 'control-plane', breakerThreshold = POLICY.breaker_threshold, now = () => new Date().toISOString(), leaseMs, requireCi = false, repo = null, notifier = null, diffs = null, protection = null } = {}) {
     if (!dir) throw new Error('dir is required');
     this.store = new Store(dir, { leaseMs });
     this.planner = assertPlannerAdapter(planner);
@@ -39,6 +40,10 @@ class ControlPlane {
     this.requireCi = requireCi;
     this.repo = repo;
     this.notifier = notifier || new OwnerIssueOutbox(dir);
+    // Protected paths: with a real repo the control plane MUST be able to compute the real diff.
+    if (repo && !diffs) throw new TypeError('a repo requires a diff provider (protected-path check)');
+    this.diffs = diffs;
+    this.protection = diffs ? (protection || loadProtection()) : null;
   }
 
   init(opts) {
@@ -318,7 +323,8 @@ class ControlPlane {
   }
 
   // ---- WAITING_APPROVAL ------------------------------------------------------------------------
-  _stepWaitingApproval(s, tx, ctx) {
+  async _stepWaitingApproval(s, tx, ctx, note) {
+    if (s.held) return this._stepHeldResult(s, tx, ctx, note);
     const handoff = s.current_task;
     const id = approvalIdFor(handoff);
     const decision = this._approvalDecision(this.store.readApproval(id), handoff);
@@ -401,6 +407,18 @@ class ControlPlane {
       }
       if (head !== ev.sha) return this._stale(note, ev, `branch head moved to ${head}`);
     }
+    // Protected paths: the real diff of the worker's commit, computed here (never the worker's report).
+    if (this.diffs && !(s.protected_approved && s.protected_approved.sha === ev.sha)) {
+      let touched;
+      try {
+        touched = protectedChanges(await this.diffs.changes(s.expected_sha, ev.sha), this.protection.patterns);
+      } catch (err) {
+        s.next_safe_action = `${NEEDS_HUMAN}: cannot compute diff ${s.expected_sha}..${ev.sha}`;
+        tx('BLOCKED', { event_id: ev.event_id, task_id: ev.task_id, reason: `diff unavailable (fail closed): ${err.message}` });
+        return;
+      }
+      if (touched.length > 0) return this._holdForOwner(s, tx, ctx, note, ev, touched);
+    }
     if (ev.status !== 'success') return this._fail(s, tx, ctx, note, ev, ['CI did not succeed']);
     let rejection;
     try {
@@ -412,6 +430,52 @@ class ControlPlane {
     if (rejection) return this._fail(s, tx, ctx, note, ev, [`planner review: ${rejection}`]);
     note({ kind: 'planner_review', event_id: ev.event_id, task_id: ev.task_id, actor: 'planner', verdict: 'ACCEPT' });
     this._completeTask(s, tx, ev, `CI passed and planner accepted at ${ev.sha}`);
+  }
+
+  // A worker commit touched protected paths: hold the CI result for the owner (OWNER/security).
+  _holdForOwner(s, tx, ctx, note, ev, touched) {
+    const id = `${ev.task_id}.protected.${ev.sha.slice(0, 12)}`;
+    const files = touched.map((t) => `${t.status} ${t.old_path ? `${t.old_path} -> ` : ''}${t.path}`);
+    const existing = this.store.readApproval(id);
+    const answer = this._approvalDecision(existing, { task_id: ev.task_id, action: 'protected_paths' });
+    if (answer === 'denied') {
+      s.next_safe_action = `${NEEDS_HUMAN}: protected-path change ${id} denied`;
+      tx('BLOCKED', { event_id: ev.event_id, task_id: ev.task_id, reason: `owner denied protected-path change ${id}` });
+      return;
+    }
+    note({ kind: 'protected_paths_touched', event_id: ev.event_id, task_id: ev.task_id, actor: this.actor, sha: ev.sha, files });
+    Object.assign(s, { held: { event: clone(ev), approval_id: id }, current_owner: 'human', next_safe_action: `await owner decision ${id} (security: protected paths)` });
+    tx('WAITING_APPROVAL', { event_id: ev.event_id, task_id: ev.task_id, reason: `OWNER/security (policy): protected paths touched: ${files.join(', ')}` });
+    if (!existing) {
+      const record = {
+        approval_id: id, task_id: ev.task_id, action: 'protected_paths', category: 'security', decided_by: 'policy',
+        reason: `worker commit ${ev.sha} touches protected paths: ${files.join(', ')}`, files: touched, sha: ev.sha,
+        requested_at: this.now(), requested_by: 'control-plane', status: 'pending', approved_by: null, approved_at: null,
+      };
+      ctx.afterCommit.push(() => {
+        this.store.writeApproval(record);
+        this.notifier.ownerDecision(record);
+      });
+      note({ kind: 'approval_requested', approval_id: id, task_id: ev.task_id, actor: this.actor, category: 'security' });
+    }
+  }
+
+  // WAITING_APPROVAL for a held CI result: approved -> back to WAITING_EVENT and on to review.
+  async _stepHeldResult(s, tx, ctx, note) {
+    const { event: ev, approval_id: id } = s.held;
+    const answer = this._approvalDecision(this.store.readApproval(id), { task_id: ev.task_id, action: 'protected_paths' });
+    if (answer === 'denied') {
+      Object.assign(s, { held: null, next_safe_action: `${NEEDS_HUMAN}: protected-path change ${id} denied` });
+      tx('BLOCKED', { event_id: ev.event_id, task_id: ev.task_id, reason: `owner denied protected-path change ${id}` });
+      return undefined;
+    }
+    if (answer !== 'approved') {
+      ctx.result = { progressed: false, reason: 'awaiting_approval' };
+      return undefined;
+    }
+    Object.assign(s, { held: null, protected_approved: { sha: ev.sha, approval_id: id }, current_owner: 'planner', awaiting: 'ci' });
+    tx('WAITING_EVENT', { event_id: ev.event_id, task_id: ev.task_id, reason: `owner approved protected-path change ${id}` });
+    return this._onCiResult(s, tx, ctx, note, ev);
   }
 
   // Planner evaluates evidence (spec §4.6). Only an exact { verdict: 'ACCEPT' } accepts.
@@ -432,7 +496,7 @@ class ControlPlane {
   _completeTask(s, tx, ev, reason) {
     s.completed_tasks.push(ev.task_id);
     Object.assign(s, {
-      last_verified_sha: ev.sha, expected_sha: null, failure_count: 0, awaiting: null, pending_ci_sha: null, last_failure: null,
+      last_verified_sha: ev.sha, expected_sha: null, failure_count: 0, awaiting: null, pending_ci_sha: null, last_failure: null, held: null, protected_approved: null,
       current_task_id: null, current_task: null, current_owner: 'planner', next_safe_action: 'plan next task',
     });
     tx('RUNNING', { event_id: ev.event_id, task_id: ev.task_id, reason });
@@ -441,7 +505,7 @@ class ControlPlane {
   // Failure path + circuit breaker.
   _fail(s, tx, ctx, note, ev, errors) {
     s.failure_count += 1;
-    Object.assign(s, { awaiting: null, pending_ci_sha: null, last_failure: { task_id: ev.task_id, event_id: ev.event_id, errors: [...errors] } });
+    Object.assign(s, { awaiting: null, pending_ci_sha: null, held: null, protected_approved: null, last_failure: { task_id: ev.task_id, event_id: ev.event_id, errors: [...errors] } });
     tx('FAILED', { event_id: ev.event_id, task_id: ev.task_id, reason: `evidence rejected: ${errors.join('; ')}` });
     if (s.failure_count >= this.breakerThreshold) {
       this._escalate(s, tx, ctx, note, {

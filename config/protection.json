@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "_README": "Protected paths and owner approvers. src/protectedPaths.js hard-codes a floor of protected paths; this file can only ADD to it (extra_protected_paths), never remove. approvers: GitHub logins whose /approve or /deny in an owner-decision issue counts (also requires author_association OWNER). This file is itself protected (config/**). Change only via a reviewed PR.",
+  "extra_protected_paths": [],
+  "approvers": ["cluborchestra"]
+}

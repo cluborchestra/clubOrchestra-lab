@@ -47,6 +47,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
+          fetch-depth: 0 # full history: the protected-path check diffs base..head
       - name: Check out state (orchestra-state)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -55,8 +56,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
-      - name: Fetch task branch heads (exact-SHA gate reads them from .git)
-        run: git fetch --no-tags --depth=1 origin '+refs/heads/co/*:refs/heads/co/*'
+      - name: Fetch task branches (exact-SHA gate + protected-path diff read them from .git)
+        run: git fetch --no-tags origin '+refs/heads/co/*:refs/heads/co/*'
       - name: Ingest workflow_run into the control plane
         env:
           REPO: ${{ github.repository }}

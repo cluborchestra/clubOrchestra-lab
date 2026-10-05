@@ -8,8 +8,10 @@ const STATES = Object.freeze([
 const TRANSITIONS = Object.freeze({
   IDLE: ['RUNNING', 'BLOCKED'],
   RUNNING: ['WAITING_EVENT', 'WAITING_APPROVAL', 'COMPLETE', 'BLOCKED'],
-  WAITING_EVENT: ['RUNNING', 'FAILED', 'BLOCKED'],
-  WAITING_APPROVAL: ['RUNNING', 'BLOCKED'],
+  // -> WAITING_APPROVAL: a worker result touched protected paths and is held for the owner.
+  WAITING_EVENT: ['RUNNING', 'FAILED', 'BLOCKED', 'WAITING_APPROVAL'],
+  // -> WAITING_EVENT: the owner approved a held worker result (protected paths); it goes on to review.
+  WAITING_APPROVAL: ['RUNNING', 'BLOCKED', 'WAITING_EVENT'],
   FAILED: ['RUNNING', 'BLOCKED'],
   BLOCKED: ['IDLE'], // only via explicit human reset
   COMPLETE: [], // terminal

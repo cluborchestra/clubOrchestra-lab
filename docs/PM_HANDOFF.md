@@ -22,24 +22,24 @@ raunverulegir agentar eru til, engir lyklar, og eytt hefur verið 0 USD.
 | P2b | VERIFIED LIVE (hermdir workers) |
 | P3 Lot 1 | ACCEPTED |
 | P3 Lot 2 | ACCEPTED |
-| P3 Lot 2b + escalation | Í QA: 120/120 próf græn, staðbundið |
+| P3 Lot 2b + escalation + skjölun | ACCEPTED |
+| PRE3 (verndaðar slóðir, `/approve`, fest CLI) | Í QA: 143/143 próf græn, staðbundið |
 
 Tvítekningarprófið er VERIFIED í dry-run; live-útgáfan er frestuð (B5).
 
 ## OPEN WORK
-- **`feat/co-p3-lot2b-async`:** Lot 1, 2 og 2b, staflað. Pushuð; ekki mergeuð, og PR ekki opnað.
+- **`feat/co-p3-pre3-001`:** PRE3 ofan á Lot 1, 2 og 2b (staflað). Pushuð; ekki mergeuð, og PR ekki opnað.
 - **`docs/co-p2b-e2e-status`:** pushuð; PR ekki staðfest.
-- **PRE3** (verndaðar skrár, `/approve` í issue, fest CLI-útgáfa): bíður verklýsingar frá PM; ekki hafið.
 
 ## NOW
-QA á CO-P3-LOT2B-001 ([evidence](../evidence/CO-P3-LOT2B-001.md)).
+QA á CO-P3-PRE3-001 ([evidence](../evidence/CO-P3-PRE3-001.md)).
 
 ## NEXT
-1. Merge PRs (docs, síðan P3), með merge commit.
+1. Merge PRs (docs, síðan P3-staflinn), með merge commit. Þá virkjast `approval.yml`.
 2. Lot 3, eftir samþykki.
 
 ## LATER
-B1 tilkynningar · B2 OWNER_CARD · B3 samþykki í issue · B4 watchdog · B6–B7 snyrting · P5 bilanapróf.
+B1 tilkynningar · B2 OWNER_CARD · B4 watchdog · B8 endurræsing eftir `/approve` · B6–B7 snyrting · P5 bilanapróf.
 
 ## BLOCKERS
 B5: live tvítekningarpróf bíður heilbrigðra GitHub runners.
@@ -53,6 +53,7 @@ B5: live tvítekningarpróf bíður heilbrigðra GitHub runners.
    5. undanþága fyrir `src/agents/live.js`.
 2. Merge á biðgreinum.
 3. Tímasetning B5.
+4. Approvers-listi (í dag aðeins `cluborchestra`).
 
 ## IMPORTANT BOUNDARIES
 - Ekkert kostar án „já“ frá Ása.
@@ -60,4 +61,5 @@ B5: live tvítekningarpróf bíður heilbrigðra GitHub runners.
   orchestrator-inn er armaður.
 - Einangrað frá netoryggi@ og p9@. Commits nota noreply-netfang.
 - Vafi → til Ása (fail-closed).
+- Worker breytir aldrei verndaðri slóð án OWNER. `/approve` gildir aðeins frá eiganda á bot-issue.
 - Hlekkir til PM: permalink með commit-SHA, aldrei greinarheiti.

@@ -9,6 +9,7 @@ const { workflowRunToEvent } = require('../src/adapters/github');
 const { validateEvent } = require('../src/events');
 const { ControlPlane } = require('../src/controlPlane');
 const { GitRefs } = require('../src/gitRefs');
+const { GitDiff } = require('../src/gitDiff');
 const { OutboxWorker } = require('../src/outboxWorker');
 const { SimPlanner } = require('../src/sim/planner');
 const { ingestWorkflowRun } = require('../src/ingest');
@@ -212,7 +213,7 @@ test('reconcile: awaiting worker with no commit -> waits, never re-dispatches', 
   const root = tmpDir('p2a-nocommit');
   const repo = new ScratchRepo(path.join(root, 'repo')).init();
   const dir = path.join(root, 'control');
-  const cp = new ControlPlane({ dir, planner: new SimPlanner(), worker: new OutboxWorker(dir), requireCi: true, repo: new GitRefs(repo.gitDir) })
+  const cp = new ControlPlane({ dir, planner: new SimPlanner(), worker: new OutboxWorker(dir), requireCi: true, repo: new GitRefs(repo.gitDir), diffs: new GitDiff(repo.gitDir) })
     .init({ base_sha: repo.baseSha });
   await cp.start();
   await cp.run();

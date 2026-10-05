@@ -10,7 +10,7 @@
   "loop_detect_repeats": 2,
 
   "transport": { "max_retries": 2, "max_retry_after_s": 30, "backoff_ms": 1000 },
-  "claude_code": { "allowed_tools": ["Read", "Edit", "Write", "Bash(npm test)", "Bash(git status)", "Bash(git diff *)", "Bash(git add *)", "Bash(git commit *)"] },
+  "claude_code": { "version": "2.1.286", "allowed_tools": ["Read", "Edit", "Write", "Bash(npm test)", "Bash(git status)", "Bash(git diff *)", "Bash(git add *)", "Bash(git commit *)"] },
 
   "daily_spend_cap_usd": 2.00,
   "per_call_max_usd": 0.50,

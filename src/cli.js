@@ -12,6 +12,10 @@
 //   node src/cli.js reset <dir> --by <name>     human reset BLOCKED -> IDLE
 //   node src/cli.js owner-issues <dir> <outDir>        write <id>.title/<id>.md per unopened owner issue; print ids
 //   node src/cli.js owner-issue-opened <dir> <id> <url> record the opened issue URL (idempotent)
+//   node src/cli.js owner-command <dir> <issue_comment event.json> <outPrefix>
+//       approval workflow: evaluate /approve or /deny (src/ownerCommands.js); on a reply writes
+//       <outPrefix>.issue + <outPrefix>.reply.md, and <outPrefix>.close when the issue should close
+//   node src/cli.js check-claude-version "<output of claude --version>"   exit 0 only on the exact pin
 //   node src/cli.js ingest <dir> <workflow_run.json> --git-dir <path> [--repo owner/name]
 //       P2 entry point used by .github/workflows/orchestrator.yml: GitHub workflow_run payload ->
 //       adapter -> intake -> control plane steps (CI-gated, head read from --git-dir).
@@ -25,6 +29,12 @@ const { OutboxWorker } = require('./outboxWorker');
 const { GitRefs } = require('./gitRefs');
 const { ingestWorkflowRun } = require('./ingest');
 const { OwnerIssueOutbox } = require('./ownerIssues');
+const { GitDiff } = require('./gitDiff');
+const { evaluateOwnerComment } = require('./ownerCommands');
+const { loadProtection } = require('./protectedPaths');
+const { verifyClaudeVersion } = require('./claudeVersion');
+const { loadLimits } = require('./agents/limits');
+const { Store } = require('./store');
 
 const APPROVAL_PLAN = [DEFAULT_PLAN[0], { task_id: 'CO-SIM-003', action: 'deploy', objective: 'Simulated deploy (approval-gated)' }];
 
@@ -109,7 +119,7 @@ async function main(argv) {
       const gitDir = flag(args, '--git-dir');
       if (!dir || !file || !gitDir) throw new Error('usage: ingest <dir> <workflow_run.json> --git-dir <path> [--repo owner/name]');
       const cp = new ControlPlane({
-        dir, planner: new SimPlanner(), worker: new OutboxWorker(dir), requireCi: true, repo: new GitRefs(gitDir),
+        dir, planner: new SimPlanner(), worker: new OutboxWorker(dir), requireCi: true, repo: new GitRefs(gitDir), diffs: new GitDiff(gitDir),
       });
       const raw = fs.readFileSync(file, 'utf8');
       let gh;
@@ -143,6 +153,36 @@ async function main(argv) {
       new OwnerIssueOutbox(dir).markOpened(id, url);
       return 0;
     }
+    case 'owner-command': {
+      const [dir, eventFile, outPrefix] = args;
+      if (!dir || !eventFile || !outPrefix) throw new Error('usage: owner-command <dir> <event.json> <outPrefix>');
+      const store = new Store(dir);
+      let payload;
+      try { payload = JSON.parse(fs.readFileSync(eventFile, 'utf8')); } catch { payload = null; }
+      const r = evaluateOwnerComment(payload, {
+        approvers: loadProtection().approvers, store, outbox: new OwnerIssueOutbox(dir), now: () => new Date().toISOString(),
+      });
+      // Audit: outcome and ids only; comment text is never logged.
+      store.appendAudit({
+        ts: new Date().toISOString(), actor: 'approval-workflow', kind: 'owner_command', outcome: r.outcome, code: r.code,
+        approval_id: r.approval_id || null, task_id: null, event_id: null,
+        comment_id: payload && payload.comment && Number.isSafeInteger(payload.comment.id) ? payload.comment.id : null,
+        commenter: payload && payload.comment && payload.comment.user && typeof payload.comment.user.login === 'string' ? payload.comment.user.login.slice(0, 40) : null,
+      });
+      if (r.reply) {
+        fs.writeFileSync(`${outPrefix}.issue`, String(r.issue_number));
+        fs.writeFileSync(`${outPrefix}.reply.md`, `${r.reply}\n`);
+        if (r.close) fs.writeFileSync(`${outPrefix}.close`, '1');
+      }
+      console.log(JSON.stringify({ outcome: r.outcome, code: r.code, approval_id: r.approval_id || null }));
+      return 0;
+    }
+    case 'check-claude-version': {
+      const expected = loadLimits().claude_code.version;
+      const ok = verifyClaudeVersion(args[0], expected);
+      console.log(ok ? `claude CLI version OK: ${expected}` : `claude CLI version mismatch: expected "${expected} (Claude Code)", got "${String(args[0]).slice(0, 80)}"`);
+      return ok ? 0 : 1;
+    }
     case 'reset': {
       const by = flag(args, '--by');
       await makeCp(args[0]).humanReset({ by });
@@ -150,7 +190,7 @@ async function main(argv) {
       return 0;
     }
     default:
-      console.error('usage: node src/cli.js <demo|demo-approval|init|run|status|approve|deny|reset|ingest|owner-issues|owner-issue-opened> ...');
+      console.error('usage: node src/cli.js <demo|demo-approval|init|run|status|approve|deny|reset|ingest|owner-issues|owner-issue-opened|owner-command|check-claude-version> ...');
       return 2;
   }
 }

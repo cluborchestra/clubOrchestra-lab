@@ -143,6 +143,57 @@ example). This is intentional, not a counting error:
 - The true history is kept elsewhere: the audit log has every FAIL transition, and the escalation
   record (`kind: loop_detected`, `code: REPEATED_OUTPUT`) has the hash and the repeat count.
 
+## 4c. Protected paths, owner commands, pinned CLI (PRE3)
+- **Protected paths** (`src/protectedPaths.js`): the worker must never change its own rules.
+  - **The floor is hard-coded:** `.github/**`, `config/**`, `src/escalation.js`,
+    `src/agents/spendGuard.js`, `src/agents/limits.js`, `src/agents/live.js`, `src/fileLock.js`,
+    `test/support/no-network.js`, `package.json`, `package-lock.json`, `docs/PROJECT_STATUS.json`,
+    `docs/CLUB_DOCUMENTATION_STANDARD.md`.
+  - `config/protection.json` can only add paths, and is itself protected.
+  - **When it is checked:** after the CI result, on the real diff `base..head` computed by the
+    control plane (`src/gitDiff.js`: `git diff --raw -z -M`). It covers additions, deletions,
+    renames in and out, mode changes, and symlinks whose target is protected or leaves the repo.
+  - **Matching** is case-insensitive. `../`, absolute and unclear paths count as protected.
+  - **Touching a protected path:** the result is held as OWNER/security in `WAITING_APPROVAL`, and
+    the issue lists the files. Approved → review; denied → BLOCKED. A diff that cannot be computed →
+    BLOCKED.
+  - The planner cannot override this. The worker system prompt adds "Do not modify protected paths;
+    request OWNER instead."
+- **`src/gitDiff.js`** is the single `src/` file allowed to start a process:
+  - only `execFileSync('git', [...])` with `shell: false`;
+  - only `diff` and `cat-file`, with `--no-ext-diff --no-textconv`;
+  - no network subcommands. The offline test asserts each of these.
+
+  The orchestrator checks out `main` with `fetch-depth: 0` and fetches `co/*` without
+  `--depth`, so the base commit is always present.
+- **/approve and /deny in issues** (`.github/workflows/approval.yml`, rules in
+  `src/ownerCommands.js`). The repo is public. A comment counts only if:
+  - the commenter is in `config/protection.json` approvers and has `author_association: OWNER`;
+  - the issue was opened by `github-actions[bot]`, has exactly one hidden
+    `<!-- clubOrchestra:approval_id=… -->` marker, and is the issue our outbox recorded for that id
+    (the id never comes from the comment);
+  - the approval is still pending (otherwise "already decided"; a replay of the same comment is a
+    silent no-op);
+  - the first line is exactly `/approve` or `/deny` (not quoted, indented or fenced);
+  - the action is `created`.
+
+  Everything else is ignored and audit-logged (outcome and ids only, never the text), with no reply.
+
+  Workflow:
+  - `permissions: issues: write, contents: write`; no secrets; no `pull_request_target`;
+  - the comment never appears in a `run:` block (the CLI reads `$GITHUB_EVENT_PATH`);
+  - same concurrency group as the orchestrator;
+  - it runs only from `main`, so it takes effect after merge.
+
+  The decision text is stored as data (`decision_reason`) and never reaches the planner or worker
+  (tested).
+- **Pinned Claude Code CLI:** `worker.yml` installs `@anthropic-ai/claude-code@2.1.286` (equal to
+  `config/agent-limits.json` `claude_code.version`; a test keeps them equal). The next step
+  fails closed unless `claude --version` prints exactly `2.1.286 (Claude Code)`. The worker
+  workflow stays disabled (`WORKER_ENABLED` unset), has no secrets and makes no model call.
+  - *Not verified yet:* that the npm package and version install cleanly on the runner, since no
+    download was made. Its first run checks this, and the version check fails closed.
+
 ## 5. Detection, rotation, kill switches
 - GitHub **secret scanning + push protection** stay on (default for public repos), so a key
   committed by mistake is blocked or flagged.

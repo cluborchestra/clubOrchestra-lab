@@ -20,6 +20,8 @@ function initialState({ project_id, repo, branch, base_sha }) {
     current_task: null,
     current_owner: null,
     awaiting: null, // 'worker' | 'ci' while WAITING_EVENT
+    held: null, // a CI result held for the owner (protected paths touched)
+    protected_approved: null, // { sha, approval_id } once the owner approved that exact sha
     pending_ci_sha: null,
     lease_until: null,
     repo,

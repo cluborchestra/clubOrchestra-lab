@@ -9,6 +9,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { ControlPlane } = require('../src/controlPlane');
 const { GitRefs } = require('../src/gitRefs');
+const { GitDiff } = require('../src/gitDiff');
 const { SimPlanner } = require('../src/sim/planner');
 const { taskBranch } = require('../src/policy');
 const { ingestWorkflowRun } = require('../src/ingest');
@@ -110,12 +111,15 @@ class SimCI {
 }
 
 class GitWorker extends WorkerAdapter {
-  constructor({ repo, ci, clock, crashAfterCommit = [] }) {
+  // sneakyPath: task_id -> path the worker writes INSTEAD of work/<task>.txt, while still reporting
+  // work/<task>.txt (models a worker touching a protected path without saying so).
+  constructor({ repo, ci, clock, crashAfterCommit = [], sneakyPath = {} }) {
     super();
     this.repo = repo;
     this.ci = ci;
     this.clock = clock;
     this.crashAfterCommit = new Set(crashAfterCommit); // task_ids: crash once after committing
+    this.sneakyPath = sneakyPath;
     this.attempts = {};
     this.calls = [];
   }
@@ -124,7 +128,7 @@ class GitWorker extends WorkerAdapter {
     const attempt = (this.attempts[h.task_id] = (this.attempts[h.task_id] || 0) + 1);
     this.calls.push(h.task_id);
     const branch = taskBranch(h.task_id);
-    const sha = this.repo.commitOnBranch(branch, h.starting_sha, `work/${h.task_id}.txt`,
+    const sha = this.repo.commitOnBranch(branch, h.starting_sha, this.sneakyPath[h.task_id] || `work/${h.task_id}.txt`,
       `${h.task_id} attempt ${attempt}\n`, `${h.task_id}: ${h.objective} (attempt ${attempt})`);
     this.ci.onPush(branch, sha); // the push triggers CI on GitHub's side, whatever happens to us next
     if (this.crashAfterCommit.delete(h.task_id)) throw new Error(`simulated crash after commit ${sha}`);
@@ -148,7 +152,7 @@ function makeClock() {
 }
 
 // Wire everything for a run rooted at `root` (inside the repo, gitignored).
-function createLocalLoop({ root, plan, ciScript, redeliver = true, crashAfterCommit = [], rejectReviews = [], makePlanner = null }) {
+function createLocalLoop({ root, plan, ciScript, redeliver = true, crashAfterCommit = [], rejectReviews = [], makePlanner = null, sneakyPath = {} }) {
   const clock = makeClock();
   const repo = new ScratchRepo(path.join(root, 'repo')).init();
   const ci = new SimCI({ clock, script: ciScript, redeliver });
@@ -159,10 +163,10 @@ function createLocalLoop({ root, plan, ciScript, redeliver = true, crashAfterCom
     loop.planner = makePlanner
       ? makePlanner({ plan, repo: REPO_FULL_NAME, rejectReviews, controlDir })
       : new SimPlanner({ ...(plan ? { plan } : {}), repo: REPO_FULL_NAME, rejectReviews });
-    loop.worker = new GitWorker({ repo, ci, clock, crashAfterCommit: crash });
+    loop.worker = new GitWorker({ repo, ci, clock, crashAfterCommit: crash, sneakyPath });
     loop.cp = new ControlPlane({
       dir: controlDir, planner: loop.planner, worker: loop.worker, now: clock,
-      requireCi: true, repo: new GitRefs(repo.gitDir),
+      requireCi: true, repo: new GitRefs(repo.gitDir), diffs: new GitDiff(repo.gitDir),
     }).init({ repo: REPO_FULL_NAME, base_sha: repo.baseSha });
     return loop.cp;
   };

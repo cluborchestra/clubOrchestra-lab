@@ -41,7 +41,12 @@ class OwnerIssueOutbox {
         '',
         `**To decide:** set \`status\` to \`approved\` (with \`approved_by\`) or \`denied\` in \`data/approvals/${approval.approval_id}.json\` on branch \`orchestra-state\`. Until then nothing for this task runs.`,
         '',
+        '**Or reply here** with a comment whose first line is exactly `/approve` or `/deny` (an optional reason may follow). Only the owner\'s comment counts.',
+        '',
         `_Requested ${approval.requested_at} by the clubOrchestra control plane._`,
+        '',
+        // Hidden marker: the approval workflow reads the approval id from here, never from a comment.
+        `<!-- clubOrchestra:approval_id=${approval.approval_id} -->`,
       ].join('\n'),
       requested_at: approval.requested_at,
       issue_url: null,

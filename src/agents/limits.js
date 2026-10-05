@@ -38,7 +38,8 @@ function validateLimits(l) {
   if (!cc || !Array.isArray(cc.allowed_tools) || cc.allowed_tools.length === 0 || !cc.allowed_tools.every((x) => typeof x === 'string' && x.length > 0 && !x.includes(','))) {
     errors.push('claude_code.allowed_tools must be a non-empty list of tool names (no commas: the list is passed comma-separated)');
   }
-  if (cc && Object.keys(cc).some((k) => k !== 'allowed_tools')) errors.push('claude_code accepts only allowed_tools (the run budget is per_call_max_usd)');
+  if (!cc || typeof cc.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(cc.version)) errors.push('claude_code.version must be an exact x.y.z version (pinned CLI)');
+  if (cc && Object.keys(cc).some((k) => !['allowed_tools', 'version'].includes(k))) errors.push('claude_code accepts only allowed_tools and version (the run budget is per_call_max_usd)');
 
   // Prices: { input, output } USD per million tokens, or { reported_cost: true } for an agent that
   // reports its own cost (Claude Code headless: total_cost_usd). A model without an entry is refused.

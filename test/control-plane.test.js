@@ -311,5 +311,24 @@ test('offline: control-plane source imports no network modules and no env secret
   const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((f) => (f.isDirectory() ? walk(path.join(d, f.name)) : files.push(path.join(d, f.name))));
   walk(srcDir);
   const banned = /require\(['"](node:)?(http|https|net|dgram|tls|dns|http2|child_process)['"]\)|\bfetch\(|process\.env|XMLHttpRequest|WebSocket/;
-  for (const f of files) assert.doesNotMatch(fs.readFileSync(f, 'utf8'), banned, f);
+  // The ONE exemption (PRE3): src/gitDiff.js may start the local git binary, read-only, to compute
+  // the real diff of a worker commit. It is checked separately below, not skipped.
+  const GIT_DIFF = path.join(srcDir, 'gitDiff.js');
+  for (const f of files) {
+    const text = fs.readFileSync(f, 'utf8');
+    if (f === GIT_DIFF) continue;
+    assert.doesNotMatch(text, banned, f);
+  }
+  const g = fs.readFileSync(GIT_DIFF, 'utf8');
+  const noChildProcess = g.replace("require('node:child_process')", '');
+  assert.doesNotMatch(noChildProcess, banned, 'gitDiff.js: nothing else from the banned list');
+  assert.deepEqual(g.match(/require\(['"][^'"]+['"]\)/g), ["require('node:child_process')", "require('./events')"]);
+  const code = g.replace(/^\s*\/\/.*$/gm, ''); // ignore comments
+  // process-starting calls (a bare call, not a method such as RegExp.prototype.exec)
+  assert.deepEqual([...new Set([...code.matchAll(/(?<![.\w])(execFileSync|execFile|exec|execSync|spawn|spawnSync|fork)\(/g)].map((m) => m[1]))], ['execFileSync']);
+  assert.match(g, /execFileSync\('git', \[/); // fixed binary, argument array
+  assert.match(g, /shell: false/);
+  const subcommands = [...g.matchAll(/this\._git\(\['([a-z-]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(subcommands.sort(), ['cat-file', 'diff']); // read-only, local
+  assert.doesNotMatch(g, /'(fetch|push|pull|clone|remote|ls-remote|submodule|config)'/);
 });

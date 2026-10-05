@@ -298,3 +298,17 @@ irreversible, security, or **uncertain**):
 ```bash
 node --test test/p3-escalation.test.js
 ```
+
+## PRE3: protected paths, /approve in issues, pinned CLI
+
+- **Protected paths:** `src/protectedPaths.js` + `src/gitDiff.js`. The control plane diffs the
+  worker's commit itself. Touching `.github/**`, `config/**`, the spend/escalation rules, the
+  network trap or package files holds the result as OWNER/security.
+- **/approve and /deny:** `.github/workflows/approval.yml` + `src/ownerCommands.js`. They count only
+  from the allowlisted owner, on the bot's issue, for a pending approval.
+- **Pinned CLI:** `.github/workflows/worker.yml` (disabled skeleton) installs Claude Code `2.1.286`.
+  `node src/cli.js check-claude-version "$(claude --version)"` fails closed on any other version.
+
+```bash
+node --test test/p3-pre3.test.js
+```
