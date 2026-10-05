@@ -4,12 +4,9 @@ const { Store } = require('./store');
 const { POLICY, taskBranch } = require('./policy');
 const { isLegalTransition, IllegalTransitionError } = require('./states');
 const { validateEvent, verifyEvidence, isPlainObject } = require('./events');
-
-const HANDOFF_REQUIRED = Object.freeze([
-  'task_id', 'action', 'objective', 'why', 'repo', 'branch_policy', 'starting_sha', 'allowed_scope',
-  'forbidden_scope', 'acceptance_criteria', 'required_tests', 'security_boundaries',
-  'documentation_requirements', 'evidence_required', 'return_format',
-]);
+const { HANDOFF_REQUIRED } = require('./handoff');
+const { assertPlannerAdapter, assertWorkerAdapter } = require('./agents/adapter');
+const { AgentHaltError } = require('./agents/errors');
 const ID_RE = /^[A-Za-z0-9._-]{1,100}$/;
 const NEEDS_HUMAN = 'NEEDS_HUMAN';
 
@@ -32,8 +29,8 @@ class ControlPlane {
   constructor({ dir, planner, worker, actor = 'control-plane', breakerThreshold = POLICY.breaker_threshold, now = () => new Date().toISOString(), leaseMs, requireCi = false, repo = null } = {}) {
     if (!dir) throw new Error('dir is required');
     this.store = new Store(dir, { leaseMs });
-    this.planner = planner;
-    this.worker = worker;
+    this.planner = assertPlannerAdapter(planner);
+    this.worker = assertWorkerAdapter(worker);
     this.actor = actor;
     this.breakerThreshold = breakerThreshold;
     this.now = now;
@@ -203,7 +200,13 @@ class ControlPlane {
   // ---- RUNNING: ask planner, apply policy, dispatch or gate ----------------------------------
   _stepRunning(s, tx, ctx, note) {
     const view = Object.freeze({ completed_tasks: [...s.completed_tasks], last_verified_sha: s.last_verified_sha });
-    const raw = this.planner.nextTask(view);
+    let raw;
+    try {
+      raw = this.planner.nextTask(view);
+    } catch (err) {
+      if (err instanceof AgentHaltError) return this._halt(s, tx, ctx, note, err, { task_id: null, role: 'planner' });
+      throw err;
+    }
     if (raw === null) {
       Object.assign(s, { current_task_id: null, current_task: null, current_owner: null, next_safe_action: null });
       tx('COMPLETE', { task_id: null, reason: 'planner has no further tasks' });
@@ -278,7 +281,15 @@ class ControlPlane {
     // The worker reports back through the intake. A worker may return its result event directly
     // (simulated) or nothing (the result arrives later as a separate event).
     ctx.afterCommit.push(() => {
-      const ev = this.worker.execute(clone(handoff));
+      let ev;
+      try {
+        ev = this.worker.execute(clone(handoff));
+      } catch (err) {
+        if (!(err instanceof AgentHaltError)) throw err;
+        // The dispatch is already committed; stop in a follow-up transaction (WAITING_EVENT -> BLOCKED).
+        this._transact((s2, tx2, ctx2, note2) => this._halt(s2, tx2, ctx2, note2, err, { task_id: handoff.task_id, role: 'worker' }));
+        return;
+      }
       if (ev !== undefined && ev !== null) this.intake(ev);
     });
   }
@@ -368,7 +379,13 @@ class ControlPlane {
       if (head !== ev.sha) return this._stale(note, ev, `branch head moved to ${head}`);
     }
     if (ev.status !== 'success') return this._fail(s, tx, ctx, note, ev, ['CI did not succeed']);
-    const rejection = this._plannerReview(ev);
+    let rejection;
+    try {
+      rejection = this._plannerReview(ev);
+    } catch (err) {
+      if (err instanceof AgentHaltError) return this._halt(s, tx, ctx, note, err, { task_id: ev.task_id, event_id: ev.event_id, role: 'planner' });
+      throw err;
+    }
     if (rejection) return this._fail(s, tx, ctx, note, ev, [`planner review: ${rejection}`]);
     note({ kind: 'planner_review', event_id: ev.event_id, task_id: ev.task_id, actor: 'planner', verdict: 'ACCEPT' });
     this._completeTask(s, tx, ev, `CI passed and planner accepted at ${ev.sha}`);
@@ -381,6 +398,7 @@ class ControlPlane {
     try {
       out = this.planner.review(Object.freeze(clone({ task_id: ev.task_id, sha: ev.sha, ci_status: ev.status, evidence_refs: ev.evidence_refs || [] })));
     } catch (err) {
+      if (err instanceof AgentHaltError) throw err; // spend/loop/output halts stop the loop, not retry it
       return `review threw: ${err.message}`;
     }
     return isPlainObject(out) && out.verdict === 'ACCEPT' ? null : `verdict ${isPlainObject(out) ? String(out.verdict) : 'missing'}`;
@@ -401,18 +419,38 @@ class ControlPlane {
     Object.assign(s, { awaiting: null, pending_ci_sha: null });
     tx('FAILED', { event_id: ev.event_id, task_id: ev.task_id, reason: `evidence rejected: ${errors.join('; ')}` });
     if (s.failure_count >= this.breakerThreshold) {
-      const escalation = {
-        escalation_id: `${ev.task_id}.breaker.${s.version + 1}`,
-        task_id: ev.task_id, kind: 'circuit_breaker',
+      this._escalate(s, tx, ctx, note, {
+        tag: 'breaker', kind: 'circuit_breaker', task_id: ev.task_id, event_id: ev.event_id,
         reason: `${s.failure_count} consecutive failures (threshold ${this.breakerThreshold})`,
-        last_errors: errors, last_event_id: ev.event_id,
-        created_at: this.now(), status: 'open', assigned_to: 'human',
-      };
-      s.next_safe_action = `${NEEDS_HUMAN}: circuit breaker tripped, see escalations/${escalation.escalation_id}.json`;
-      tx('BLOCKED', { event_id: ev.event_id, task_id: ev.task_id, reason: escalation.reason });
-      note({ kind: 'escalation', event_id: ev.event_id, task_id: ev.task_id, actor: this.actor, escalation_id: escalation.escalation_id });
-      ctx.afterCommit.push(() => this.store.writeEscalation(escalation));
+        errors, headline: 'circuit breaker tripped',
+      });
     }
+  }
+
+  // An agent adapter refused to continue (spend/rate limit, loop, invalid output): fail closed.
+  // A detected loop also trips the circuit breaker (failure_count raised to the threshold).
+  _halt(s, tx, ctx, note, err, { task_id, event_id = null, role }) {
+    if (err.kind === 'loop_detected') s.failure_count = Math.max(s.failure_count + 1, this.breakerThreshold);
+    Object.assign(s, { awaiting: null, pending_ci_sha: null });
+    this._escalate(s, tx, ctx, note, {
+      tag: err.kind === 'loop_detected' ? 'loop' : err.kind === 'spend_guard' ? 'spend' : 'agent',
+      kind: err.kind, task_id, event_id,
+      reason: `${role} halted: ${err.code}: ${err.message}`,
+      errors: [err.message], headline: `${role} halted (${err.code})`, code: err.code,
+    });
+  }
+
+  _escalate(s, tx, ctx, note, { tag, kind, task_id, event_id, reason, errors, headline, code }) {
+    const escalation = {
+      escalation_id: `${task_id || 'planner'}.${tag}.${s.version + 1}`,
+      task_id, kind, ...(code ? { code } : {}),
+      reason, last_errors: errors, last_event_id: event_id,
+      created_at: this.now(), status: 'open', assigned_to: 'human',
+    };
+    s.next_safe_action = `${NEEDS_HUMAN}: ${headline}, see escalations/${escalation.escalation_id}.json`;
+    tx('BLOCKED', { event_id, task_id, reason });
+    note({ kind: 'escalation', event_id, task_id, actor: this.actor, escalation_id: escalation.escalation_id });
+    ctx.afterCommit.push(() => this.store.writeEscalation(escalation));
   }
 }
 

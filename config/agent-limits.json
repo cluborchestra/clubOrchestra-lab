@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "_README": "Spend/rate limits for agent calls (P3). Loaded by src/agents/limits.js, enforced by src/agents/spendGuard.js BEFORE every model call. Lot 1 defaults are deliberately closed: only the free mock model has a price, the daily cap is 0 USD and mode 'real' is refused, so no real call can happen. Change only via a reviewed PR.",
+
+  "mode": "mock",
+
+  "max_calls_per_task": { "planner": 3, "worker": 3 },
+  "max_output_tokens": { "planner": 2000, "worker": 8000 },
+  "loop_detect_repeats": 2,
+
+  "daily_spend_cap_usd": 0,
+  "per_call_max_usd": 0,
+
+  "pricing_usd_per_mtok": {
+    "mock/mock-1": { "input": 0, "output": 0 }
+  },
+
+  "_PRODUCT_OWNER_SETS_IN_LOT3": {
+    "mode": "'real' (only after the Lot 3 approval; the loader refuses it until the code allows it)",
+    "daily_spend_cap_usd": "your hard daily ceiling across both providers, e.g. 2.00",
+    "per_call_max_usd": "ceiling for a single call, e.g. 0.25",
+    "max_calls_per_task": "e.g. planner 3 / worker 3",
+    "pricing_usd_per_mtok": "add one entry per real model actually used, e.g. \"openai/<model>\" and \"anthropic/<model>\", with the provider's current list prices; a model without an entry is refused"
+  }
+}

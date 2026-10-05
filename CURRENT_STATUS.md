@@ -1,6 +1,6 @@
 # CURRENT_STATUS — clubOrchestra-lab
 
-**Updated:** 2026-10-05 · **Tasks:** CO-P1-001, CO-P2a-001, CO-P2b-001 · **Phase:** P2b done (core loop live on GitHub, simulated worker)
+**Updated:** 2026-10-05 · **Tasks:** CO-P1-001, CO-P2a-001, CO-P2b-001, CO-P3-LOT1-001 · **Phase:** P3 Lot 1 (agent adapters + spend controls, mock only)
 Tags: PLANNED / IMPLEMENTED / TESTED / E2E_VERIFIED / DISABLED (spec §8).
 TESTED = covered by an automated test in `test/` that passes with `npm test`.
 
@@ -21,7 +21,7 @@ pass on GitHub Actions (CI run 37355805656), and the live P2b run below used it 
 | 10 | Audit log: every transition (event_id, task_id, actor, from→to, ts) | TESTED | `src/store.js` | `audit: …`; samples in `docs/evidence/` |
 | 11 | Offline / zero cost / no secrets | TESTED | — | `offline: …` static guard on `src/` |
 | — | Untrusted payload / handoff cannot alter control logic | TESTED | `src/events.js`, `src/policy.js` | `untrusted: …` ×2 |
-| — | Real agents (OpenAI planner, Claude worker) | PLANNED | — | P3, needs Product Owner approval + spend cap |
+| — | Real agents (OpenAI planner, Claude worker) | PLANNED | — | P3 Lot 3, needs Product Owner approval + spend cap |
 
 ## P2a — GitHub loop, proven locally (CO-P2a-001)
 
@@ -37,7 +37,7 @@ pass on GitHub Actions (CI run 37355805656), and the live P2b run below used it 
 | 6 | Local harness: whole chain offline, no human "continue" | TESTED | `harness/` | `full local chain: …`, `deterministic: …` |
 | — | CI failure + planner-review rejection go through the circuit breaker | TESTED | `src/controlPlane.js` | `CI failure …`, `planner review REJECT …` |
 | — | `ingest` CLI (what the orchestrator workflow runs) | TESTED | `src/cli.js`, `src/ingest.js` | `cli ingest: …` |
-| 7 | Full suite green (now 55: P1 31 + P2a 19 + P2b 5) | TESTED | — | `npm test` |
+| 7 | Full suite green (now 71: P1 31 + P2a 19 + P2b 5 + P3 Lot 1 16) | TESTED | — | `npm test` |
 | 8 | Offline: no network modules; harness spawns only local `git` | TESTED | — | `offline: …` ×2 |
 
 ## P2b — GitHub wiring + first live run (CO-P2b-001)
@@ -92,6 +92,40 @@ P3 (real agents) first.
 **Current live state:** `WAITING_EVENT`, waiting for the worker on `CO-SIM-002` (written to `outbox/`;
 nothing executes it). This is the accepted stopping point.
 
+## P3 Lot 1 — agent adapters + spend/rate controls (CO-P3-LOT1-001)
+
+**P3 Lot 1: IMPLEMENTED + TESTED (local).** Real agents are **NOT wired**: there are no API calls,
+no keys and no cost. Lot 2 and Lot 3 are pending. Nothing in this lot touches the orchestrator,
+the workflows or `orchestra-state`.
+
+| # | Capability | Status | Where | Proof (`test/p3-lot1-agents.test.js`) |
+|---|---|---|---|---|
+| 1 | `PlannerAdapter` / `WorkerAdapter` boundary; sims, outbox/git workers and mock model agents implement it; handoff schema unchanged (moved verbatim to `src/handoff.js`) | TESTED | `src/agents/adapter.js`, `src/handoff.js` | `contract: …` ×4 |
+| 1 | No behaviour change: the mock agents run the P1 loop and the P2 local GitHub loop identically to the sims | TESTED | `src/agents/modelAgents.js`, `src/agents/mock.js` | `mock agents drive the P1 loop …`, `mock planner in the P2 local GitHub loop …`; all 55 earlier tests unchanged |
+| 2 | Spend/rate guard checked **before** every call: `max_calls_per_task`, `daily_spend_cap_usd`, `per_call_max_usd`, unpriced model, provider not enabled → BLOCKED + escalation (fail closed) | TESTED | `src/agents/spendGuard.js` | `max_calls_per_task: …`, `daily_spend_cap: …` ×2, `per-call cap, unpriced model and real providers …` |
+| 3 | Loop detector: identical worker output for the same task → circuit breaker tripped | TESTED | `src/agents/spendGuard.js`, `src/controlPlane.js` (`_halt`) | `loop detector: …` ×2 |
+| 4 | Caps in `config/agent-limits.json`, conservative defaults (mock only, 0 USD caps), `_PRODUCT_OWNER_SETS_IN_LOT3` block; invalid config or `mode: real` refused | TESTED | `config/agent-limits.json`, `src/agents/limits.js` | `config: …` |
+| 5 | Secrets plan (key names, GitHub environment secrets, least privilege, never logged) | DOCUMENTED ONLY | `SECURITY_MODEL.md` | nothing set |
+| — | Untrusted model output: malformed → BLOCKED; extra fields dropped; review needs an exact `ACCEPT`; approval gate holds | TESTED | `src/agents/modelAgents.js` | `untrusted output: …` ×2, `contract: extra fields …` |
+| — | Spend ledger stores counts, tokens, cost and hashes only, never prompts or outputs | TESTED | `src/agents/spendGuard.js` | `ledger records …` |
+
+### Still to do
+- **Lot 2: real API shape, mocked responses. Free, no keys.**
+  - Add request/response mappers for the OpenAI Responses API (Structured Outputs schema for the
+    handoff) and the Anthropic / Claude Code headless JSON output.
+  - Replay recorded-format fixture responses through the same `AgentPlanner`/`AgentWorker`.
+  - Map real usage fields into the guard's cost accounting, and handle error and timeout paths
+    (counted calls, no double spend).
+  - Add a token estimator that matches each provider's counting closely enough for the pre-call
+    estimate.
+- **Lot 3: arm real agents. Costs money, needs Product Owner approval.**
+  - The real clients get their keys from the GitHub environment `agents` (see `SECURITY_MODEL.md`).
+  - Product Owner sets the real caps and prices in `config/agent-limits.json`, and sets
+    provider-side budgets.
+  - Allow `mode: real` in the loader.
+  - Wire `outbox/` → `repository_dispatch` → a worker workflow.
+  - First supervised one-task run.
+
 ## Known limitations
 
 - `state.lock` + `version` is the local lock. On GitHub, `orchestrator.yml` adds Actions
@@ -119,3 +153,10 @@ nothing executes it). This is the accepted stopping point.
   `cluborchestra/clubOrchestra-lab`: the `ingest` CLI creates the sim planner without the full repo
   name. Cosmetic; fix in a later PR.
 - Unauthenticated GitHub API checks are limited to 60 requests/hour; poll sparingly.
+- P3 Lot 1: the spend ledger is written by the agent adapters at call time, outside the state
+  commit. That is deliberate: a call that happened is booked even if the state commit then loses
+  an optimistic-lock race. Two concurrent writers could still race on the ledger file itself. On
+  GitHub the orchestrator's `concurrency` group prevents this; Lot 3 should keep agent calls under
+  that same group.
+- P3 Lot 1: pre-call estimates use `max_output_tokens` for output (worst case). With the default
+  mock pricing everything is 0 USD; real accuracy is a Lot 2 item.

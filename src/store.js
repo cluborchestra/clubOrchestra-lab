@@ -190,4 +190,4 @@ class Store {
   }
 }
 
-module.exports = { Store, ZERO_SHA, initialState };
+module.exports = { Store, ZERO_SHA, initialState, writeJsonAtomic };

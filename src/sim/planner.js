@@ -3,13 +3,16 @@
 // Deterministic, offline planner stub (stands in for the OpenAI Responses API planner in P3).
 // Emits canned to-worker handoffs (spec §4.6) from a fixed plan: the first task not yet completed.
 
+const { PlannerAdapter } = require('../agents/adapter');
+
 const DEFAULT_PLAN = Object.freeze([
   { task_id: 'CO-SIM-001', action: 'implement', objective: 'Add greeting module' },
   { task_id: 'CO-SIM-002', action: 'test', objective: 'Add tests for greeting module' },
 ]);
 
-class SimPlanner {
+class SimPlanner extends PlannerAdapter {
   constructor({ plan = DEFAULT_PLAN, repo = 'clubOrchestra-lab', extra = {}, rejectReviews = [] } = {}) {
+    super();
     this.plan = plan;
     this.repo = repo;
     this.extra = extra; // lets tests inject arbitrary (untrusted) fields into handoffs

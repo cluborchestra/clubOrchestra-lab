@@ -12,6 +12,7 @@ const { GitRefs } = require('../src/gitRefs');
 const { SimPlanner } = require('../src/sim/planner');
 const { taskBranch } = require('../src/policy');
 const { ingestWorkflowRun } = require('../src/ingest');
+const { WorkerAdapter } = require('../src/agents/adapter');
 
 const REPO_FULL_NAME = 'local/clubOrchestra-lab';
 const FIXED_DATE = '2026-10-04T12:00:00Z';
@@ -108,8 +109,9 @@ class SimCI {
   }
 }
 
-class GitWorker {
+class GitWorker extends WorkerAdapter {
   constructor({ repo, ci, clock, crashAfterCommit = [] }) {
+    super();
     this.repo = repo;
     this.ci = ci;
     this.clock = clock;
@@ -146,7 +148,7 @@ function makeClock() {
 }
 
 // Wire everything for a run rooted at `root` (inside the repo, gitignored).
-function createLocalLoop({ root, plan, ciScript, redeliver = true, crashAfterCommit = [], rejectReviews = [] }) {
+function createLocalLoop({ root, plan, ciScript, redeliver = true, crashAfterCommit = [], rejectReviews = [], makePlanner = null }) {
   const clock = makeClock();
   const repo = new ScratchRepo(path.join(root, 'repo')).init();
   const ci = new SimCI({ clock, script: ciScript, redeliver });
@@ -154,7 +156,9 @@ function createLocalLoop({ root, plan, ciScript, redeliver = true, crashAfterCom
   fs.rmSync(controlDir, { recursive: true, force: true });
   const loop = { root, clock, repo, ci, controlDir };
   loop.newControlPlane = ({ crash = crashAfterCommit } = {}) => {
-    loop.planner = new SimPlanner({ ...(plan ? { plan } : {}), repo: REPO_FULL_NAME, rejectReviews });
+    loop.planner = makePlanner
+      ? makePlanner({ plan, repo: REPO_FULL_NAME, rejectReviews, controlDir })
+      : new SimPlanner({ ...(plan ? { plan } : {}), repo: REPO_FULL_NAME, rejectReviews });
     loop.worker = new GitWorker({ repo, ci, clock, crashAfterCommit: crash });
     loop.cp = new ControlPlane({
       dir: controlDir, planner: loop.planner, worker: loop.worker, now: clock,

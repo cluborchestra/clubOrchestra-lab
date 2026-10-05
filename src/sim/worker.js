@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { WorkerAdapter } = require('../agents/adapter');
 
 // Deterministic, offline worker stub (stands in for Claude Code headless in P3).
 // Given a handoff, returns a canned task.completed event carrying a from-worker result (§4.6).
@@ -10,8 +11,9 @@ function fakeSha(...parts) {
   return crypto.createHash('sha1').update(parts.join('|')).digest('hex');
 }
 
-class SimWorker {
+class SimWorker extends WorkerAdapter {
   constructor({ script = {}, project_id = 'clubOrchestra-lab', branch = 'main', clock = () => new Date().toISOString(), payloadExtra = {} } = {}) {
+    super();
     this.script = script;
     this.project_id = project_id;
     this.branch = branch;

@@ -9,7 +9,9 @@ clubOrchestra control plane with simulated workers.
   reconciles after a restart.
 - **P2b:** wired to GitHub: https://github.com/cluborchestra/clubOrchestra-lab (public). State
   lives on the orphan branch `orchestra-state`. The orchestrator workflow is **disabled** until
-  the Product Owner enables it. Nothing has run on real Actions yet.
+  the Product Owner enables it. First live run done: see CURRENT_STATUS.
+- **P3 Lot 1:** agent-adapter boundary + spend/rate safety controls, with **mock** model agents.
+  No real API, no keys, no cost. Secrets plan: [SECURITY_MODEL.md](SECURITY_MODEL.md).
 
 Canonical spec: [clubOrchestra_verkefna_og_vinnuplan_v0.1.md](clubOrchestra_verkefna_og_vinnuplan_v0.1.md).
 Status per feature: [CURRENT_STATUS.md](CURRENT_STATUS.md).
@@ -89,10 +91,14 @@ src/
   ingest.js        adapter -> intake (shared by CLI and harness)
   gitRefs.js       reads branch heads straight from .git files (no git binary)
   outboxWorker.js  dispatch-by-file worker for the Actions path (outbox/<task_id>.json)
+  handoff.js       the handoff schema (to-worker fields, from-worker result) shared by everyone
+  agents/          P3: adapter.js (PlannerAdapter/WorkerAdapter), modelAgents.js (AgentPlanner/
+                   AgentWorker), spendGuard.js (caps + loop detector), limits.js, mock.js, errors.js
   cli.js           offline CLI
 harness/           P2a local loop: scratch git repo, git-committing sim worker, sim CI, event pump
 .github/workflows/ ci.yml (CI placeholder), orchestrator.yml (workflow_run -> ingest; concurrency)
                    orchestrator gated off by repo variable ORCHESTRATOR_ENABLED (see below)
+config/            agent-limits.json: spend/rate caps (conservative defaults; PO sets real numbers)
 test/              node:test suites (no dependencies)
 data/              local only (gitignored); `node src/cli.js init data` creates the scaffold.
                    On GitHub the state lives on branch orchestra-state (data/ only).
@@ -177,3 +183,40 @@ enables it.
 
 CI runs on feature-branch PRs are ignored by the adapter: their branch isn't `co/`, so the result
 is "not ours" and can't block the loop.
+
+## P3 Lot 1: agent adapters + spend/rate controls (mock only)
+
+Every planner and worker implements one interface (`src/agents/adapter.js`) and exchanges the
+unchanged handoff schema (`src/handoff.js`):
+
+| Interface | Implemented by |
+|---|---|
+| `PlannerAdapter`: `nextTask(view)`, `review(evidence)` | `SimPlanner`, `AgentPlanner` (model-backed) |
+| `WorkerAdapter`: `execute(handoff)` | `SimWorker`, `OutboxWorker`, harness `GitWorker`, `AgentWorker` (model-backed) |
+
+`AgentPlanner` and `AgentWorker` are shaped like the real agents will be. They take a *client*
+(`estimate()` + `complete()`); in Lot 1 that is the deterministic `MockModelClient`. Every call
+goes through these steps:
+
+1. **`SpendGuard.check()` before the call.** It refuses the call when any of these hold:
+   - the provider is not enabled (`REAL_AGENTS_DISABLED`);
+   - the model has no price (`PRICING_UNKNOWN`);
+   - `max_calls_per_task` is used up;
+   - the per-call cap would be exceeded;
+   - the daily cap would be exceeded.
+2. **The call.**
+3. **`SpendGuard.record()`.** It books the actual cost and runs the loop detector: the same
+   worker output for the same task twice trips the circuit breaker.
+4. **Strict JSON parse + schema whitelist** of the output.
+
+Any refusal raises an `AgentHaltError`, and the control plane goes to **BLOCKED** with an
+escalation record (fail closed).
+
+Caps live in `config/agent-limits.json`. The defaults are closed: mode `mock`, `daily_spend_cap_usd: 0`,
+`per_call_max_usd: 0`, and only `mock/mock-1` (free) is priced. The Product Owner sets real
+numbers in Lot 3 (see `_PRODUCT_OWNER_SETS_IN_LOT3` in that file), via a reviewed PR. The spend
+ledger is `<state dir>/spend/ledger.json`.
+
+```bash
+node --test test/p3-lot1-agents.test.js
+```
