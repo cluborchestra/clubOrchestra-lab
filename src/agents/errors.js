@@ -12,7 +12,8 @@ class AgentHaltError extends Error {
   }
 }
 
-// A spend/rate limit would be exceeded. Raised BEFORE the model call is made.
+// A spend/rate limit would be exceeded, or the cost of a call cannot be established.
+// Limits are checked BEFORE the model call is made.
 class SpendBlockedError extends AgentHaltError {
   constructor(code, message, details) {
     super('spend_guard', code, message, details);
@@ -28,12 +29,22 @@ class LoopDetectedError extends AgentHaltError {
   }
 }
 
-// The agent's output is not valid for the handoff schema (malformed, wrong shape, wrong task).
+// The agent's output is not usable: malformed, wrong shape, wrong task, refused, truncated, or the
+// agent run itself reported an error.
 class AgentOutputError extends AgentHaltError {
-  constructor(message, details) {
-    super('agent_output', 'INVALID_OUTPUT', message, details);
+  constructor(message, details, code = 'INVALID_OUTPUT') {
+    super('agent_output', code, message, details);
     this.name = 'AgentOutputError';
   }
 }
 
-module.exports = { AgentHaltError, SpendBlockedError, LoopDetectedError, AgentOutputError };
+// The provider could not be reached or kept refusing (rate limit, 5xx, timeout) after the bounded
+// retries, or answered with a non-retryable client error.
+class AgentTransportError extends AgentHaltError {
+  constructor(code, message, details) {
+    super('agent_transport', code, message, details);
+    this.name = 'AgentTransportError';
+  }
+}
+
+module.exports = { AgentHaltError, SpendBlockedError, LoopDetectedError, AgentOutputError, AgentTransportError };

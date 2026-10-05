@@ -1,0 +1,21 @@
+{
+  "_fixture": {
+    "created": "2026-10-05",
+    "sdk": "openai@7.28.0",
+    "api": "POST /v1/responses (OpenAI Responses API)",
+    "fixture": "401 invalid key (must never be retried)",
+    "provenance": "hand-authored from the documented response shape; NOT captured from a live API"
+  },
+  "status": 401,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "error": {
+      "message": "Incorrect API key provided.",
+      "type": "invalid_request_error",
+      "param": null,
+      "code": "invalid_api_key"
+    }
+  }
+}

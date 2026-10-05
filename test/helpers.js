@@ -1,5 +1,7 @@
 'use strict';
 
+require('./support/no-network'); // every test process: any network attempt throws
+
 const fs = require('node:fs');
 const path = require('node:path');
 const { ControlPlane } = require('../src/controlPlane');

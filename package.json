@@ -4,10 +4,15 @@
   "private": true,
   "description": "clubOrchestra P1 control plane with simulated planner + worker (offline, zero dependencies)",
   "license": "UNLICENSED",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
     "demo": "node src/cli.js demo",
     "demo:approval": "node src/cli.js demo-approval"
+  },
+  "devDependencies": {
+    "openai": "7.28.0"
   }
 }

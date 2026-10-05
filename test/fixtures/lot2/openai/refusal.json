@@ -1,0 +1,73 @@
+{
+  "_fixture": {
+    "created": "2026-10-05",
+    "sdk": "openai@7.28.0",
+    "api": "POST /v1/responses (OpenAI Responses API)",
+    "fixture": "refusal content part",
+    "provenance": "hand-authored from the documented response shape; NOT captured from a live API"
+  },
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "x-request-id": "req_replay_resp_replay_refusal"
+  },
+  "body": {
+    "id": "resp_replay_refusal",
+    "object": "response",
+    "created_at": 1791244800,
+    "status": "completed",
+    "background": false,
+    "error": null,
+    "incomplete_details": null,
+    "instructions": "(planner instructions; omitted in fixture)",
+    "max_output_tokens": 2000,
+    "metadata": {},
+    "model": "gpt-replay-1",
+    "output": [
+      {
+        "type": "message",
+        "id": "msg_replay_refusal",
+        "status": "completed",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "refusal",
+            "refusal": "I can't help with that request."
+          }
+        ]
+      }
+    ],
+    "parallel_tool_calls": true,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "service_tier": "default",
+    "store": false,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "json_schema",
+        "name": "co_plan",
+        "strict": true
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_p": 1,
+    "truncation": "disabled",
+    "usage": {
+      "input_tokens": 1500,
+      "input_tokens_details": {
+        "cached_tokens": 0
+      },
+      "output_tokens": 9,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "total_tokens": 1509
+    },
+    "user": null
+  }
+}

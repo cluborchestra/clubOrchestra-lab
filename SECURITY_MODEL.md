@@ -16,19 +16,25 @@ been set up. Every step marked *Lot 3* needs the Product Owner's explicit approv
 ## 2. Secrets: names and where they live (Lot 3)
 | Secret | Used by | Purpose |
 |---|---|---|
-| `OPENAI_API_KEY` | planner job only | OpenAI Responses API (planner) |
-| `ANTHROPIC_API_KEY` | worker job only | Claude Code headless / Anthropic API (worker) |
+| `OPENAI_API_KEY` | orchestrator `ingest` job only (environment `agents-planner`) | OpenAI Responses API. The control plane calls the planner *during* `ingest` (plan + review). |
+| `ANTHROPIC_API_KEY` | worker job only (environment `agents-worker`) | Claude Code headless (worker), started by `repository_dispatch` from `outbox/` |
 
-- Stored only as **GitHub Actions environment secrets** in an environment named `agents`
-  (Settings → Environments → `agents` → Environment secrets). They are not repository-wide
-  secrets, never go in code or files, and are never in `orchestra-state`.
-- Settings for the `agents` environment:
+*Corrected in Lot 2:* an earlier draft said the orchestrator job never gets a key. In this design
+the planner runs inside the orchestrator's `ingest` step, so that job needs `OPENAI_API_KEY`, and
+only that one. The worker key is never available there.
+
+- Stored only as **GitHub Actions environment secrets**, one key per environment:
+  `agents-planner` (OpenAI) and `agents-worker` (Anthropic), under Settings → Environments. They are
+  not repository-wide secrets, never go in code or files, and are never in `orchestra-state`.
+  Each job can read only the key it needs.
+- Settings for both environments:
   - **Deployment branches: `main` only.** Jobs from other branches cannot read the keys.
   - **Required reviewer: the Product Owner**, for the first supervised Lot 3 runs. Each agent job
     waits for an explicit click. Removing the reviewer later (for the autonomous loop) is its own
     approval decision.
-- Only the planner and worker jobs declare `environment: agents`. The orchestrator job (`ingest`)
-  **never** gets the keys: it only moves events and state.
+- Only the orchestrator `ingest` job declares `environment: agents-planner`, and only the worker job
+  declares `environment: agents-worker`. CI jobs and anything triggered by a pull request never
+  declare either environment.
 - GitHub never passes secrets to `pull_request` runs from forks. This project never uses
   `pull_request_target` or `workflow_run` with untrusted checkouts in a job that holds secrets.
 
@@ -56,9 +62,58 @@ been set up. Every step marked *Lot 3* needs the Product Owner's explicit approv
   adapters must never print request headers or the raw environment.
 - The spend ledger (`data/spend/ledger.json`) and the audit log store only **counts, tokens, cost
   and SHA-256 hashes** of outputs. They never store prompts, outputs or headers (this is tested).
-- Lot 3 implementation note: the offline guard test (`offline: …`) forbids `process.env` in `src/`.
-  Real clients will live in one module (e.g. `src/agents/clients/`). The test gets a narrow,
-  reviewed exception for that path only, allowing exactly the two key names above.
+- **The adapters never touch keys** (Lot 2, tested). `src/agents/openaiResponses.js` builds the HTTP
+  request **without** an Authorization header and hands it to an injected `transport(url, init)`.
+  `src/agents/claudeCode.js` builds the `claude` invocation and hands it to an injected `runner`.
+  A test sets canary values in `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` and checks they never appear in
+  any request, invocation, ledger or audit entry.
+- **Lot 3: exactly ONE file is exempt from the offline test:** `src/agents/live.js` (name reserved,
+  does not exist yet). It holds the live HTTP transport (adds `Authorization: Bearer
+  $OPENAI_API_KEY`) and the live `claude` runner (passes `ANTHROPIC_API_KEY` only into that child's
+  environment). It is the only place allowed `fetch`/`child_process`/`process.env`, and only for
+  those two key names. The exemption names that one path, and the offline test keeps checking
+  every other file.
+- **Lot 3 design point (needs a decision):** the control plane and adapters are synchronous, while
+  real `fetch` is asynchronous. Recommendation: keep the verified control plane unchanged and give
+  `live.js` a synchronous bridge (a worker thread + `Atomics.wait`, or `spawnSync` of a small
+  helper). The alternative is to make the whole agent call path async, which touches verified
+  P1/P2 code.
+
+## 4a. Spend ledger: where it lives, concurrency, the day (P3 Lot 2 Q1/Q3)
+- **Location:** `<state dir>/spend/ledger.json`. On GitHub that is `state/data/spend/ledger.json` on
+  the `orchestra-state` branch, committed by the orchestrator's `git add data` together with
+  `state.json`. Every Actions run therefore starts from the previous run's spend. Test 12 runs
+  every step as a fresh instance on the same files, and the cap still holds.
+- **Reservation before the call:** `check()` takes a lock on the ledger (`ledger.json.lock`, O_EXCL,
+  as with `state.lock`) and adds the call's **estimate** to `spent_usd_today` before the call is
+  made. After the call, `record()` replaces the estimate with the actual cost. If the call failed
+  or its cost cannot be established, the estimate stays booked (conservative; `COST_UNKNOWN` halts).
+- **Concurrency:**
+  - On one host, the lock plus the reservation means concurrent callers cannot jointly overshoot
+    the cap. Test 13: 8 processes race for 0.30 USD each under a 1.00 cap, exactly 3 succeed and
+    0.90 is booked.
+  - Across Actions runs, the orchestrator's `concurrency: { group: clubOrchestra,
+    cancel-in-progress: false }` serialises runs.
+  - **Lot 3 requirement:** every job that calls a model runs in that same concurrency group and
+    commits the ledger in the same push as the state.
+  - **Residual risk:** if that push is rejected (optimistic lock lost), the run's ledger bookings
+    are lost with it. Serialisation prevents this. Lot 3 must also treat a rejected state push
+    after a model call as an alert, not a silent retry.
+- **The day is UTC.** `spent_usd_today` resets at 00:00 UTC, computed from the clock as
+  `new Date(now).toISOString()`, whatever offset the clock reports. Tested at the boundary and with
+  ±02:00 offsets. Call budgets (`max_calls_per_task`) never reset.
+
+## 4b. Loop detector = circuit-breaker trip (P3 Lot 2 Q2)
+When the worker returns **the same output twice for the same task** (`REPEATED_OUTPUT`), the
+control plane halts immediately and **trips the circuit breaker**: `failure_count` is raised to the
+breaker threshold (3) even if fewer real FAILs were counted (1 FAIL + the repeat in the Lot 1
+example). This is intentional, not a counting error:
+- A repeat proves retries are not making progress (spec §4.9: "same patch repeated → BLOCKED").
+  Waiting for the remaining retries would only spend more money.
+- One field answers "is the breaker tripped?" (`failure_count >= threshold`) for the human reset,
+  the future watchdog and reporting, the same way for both causes.
+- The true history is kept elsewhere: the audit log has every FAIL transition, and the escalation
+  record (`kind: loop_detected`, `code: REPEATED_OUTPUT`) has the hash and the repeat count.
 
 ## 5. Detection, rotation, kill switches
 - GitHub **secret scanning + push protection** stay on (default for public repos), so a key
@@ -75,7 +130,9 @@ been set up. Every step marked *Lot 3* needs the Product Owner's explicit approv
 1. Approve Lot 3 and a spend cap.
 2. Create the dedicated OpenAI project and Anthropic workspace, set provider-side budgets, and
    create the two keys.
-3. Create the GitHub environment `agents` (branches: `main`; required reviewer: you) and add the
-   two environment secrets.
-4. Set real numbers in `config/agent-limits.json` (`_PRODUCT_OWNER_SETS_IN_LOT3`) and merge via PR.
-5. First supervised run: one task, with the reviewer gate on.
+3. Create the GitHub environments `agents-planner` (secret `OPENAI_API_KEY`) and `agents-worker`
+   (secret `ANTHROPIC_API_KEY`). Both: branches `main` only, required reviewer: you.
+4. Set real numbers in `config/agent-limits.json` (`_PRODUCT_OWNER_SETS_IN_LOT3`): the real
+   prices for the models you choose, the daily cap and the per-call cap. Merge via PR.
+5. Decide the sync-bridge question for `src/agents/live.js` (§4).
+6. First supervised run: one task, with the reviewer gate on.

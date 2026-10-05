@@ -1,0 +1,21 @@
+{
+  "_fixture": {
+    "created": "2026-10-05",
+    "sdk": "openai@7.28.0",
+    "api": "POST /v1/responses (OpenAI Responses API)",
+    "fixture": "503 overloaded",
+    "provenance": "hand-authored from the documented response shape; NOT captured from a live API"
+  },
+  "status": 503,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "error": {
+      "message": "The engine is currently overloaded, please try again later.",
+      "type": "server_error",
+      "param": null,
+      "code": null
+    }
+  }
+}

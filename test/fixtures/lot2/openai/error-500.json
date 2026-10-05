@@ -1,0 +1,21 @@
+{
+  "_fixture": {
+    "created": "2026-10-05",
+    "sdk": "openai@7.28.0",
+    "api": "POST /v1/responses (OpenAI Responses API)",
+    "fixture": "500 server error",
+    "provenance": "hand-authored from the documented response shape; NOT captured from a live API"
+  },
+  "status": 500,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "error": {
+      "message": "The server had an error while processing your request.",
+      "type": "server_error",
+      "param": null,
+      "code": null
+    }
+  }
+}

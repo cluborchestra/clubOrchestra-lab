@@ -79,7 +79,7 @@ test('contract: mock planner in -> exactly the existing to-worker handoff out (s
   const cp = new ControlPlane({ dir, planner, worker: new SimWorker() }).init();
   assert.equal(cp._checkHandoff(h, { last_verified_sha: ZERO }), null);
   assert.equal(planner.nextTask({ completed_tasks: ['CO-SIM-001', 'CO-SIM-002'], last_verified_sha: ZERO }), null);
-  assert.deepEqual(planner.review({ task_id: 'CO-SIM-001', sha: ZERO, ci_status: 'success', evidence_refs: [] }), { verdict: 'ACCEPT' });
+  assert.deepEqual(planner.review({ task_id: 'CO-SIM-001', sha: ZERO, ci_status: 'success', evidence_refs: [] }), { verdict: 'ACCEPT', reason: null });
 });
 
 test('contract: mock worker in -> valid task.completed envelope + from-worker result out', () => {
@@ -184,10 +184,9 @@ test('daily_spend_cap: the ledger persists across processes and resets the next 
   const call = { role: 'worker', key: 'T-1', provider: 'mock', model: 'mock-1', input_tokens: 0, max_output_tokens: 5 }; // 0.005 USD
   let day = '2026-10-05T10:00:00Z';
   const g1 = new SpendGuard({ limits, ledgerPath: path.join(dir, 'ledger.json'), now: () => day });
-  g1.check(call);
-  g1.record({ ...call, usage: { input_tokens: 0, output_tokens: 5 }, text: 'a' });
-  g1.check({ ...call, key: 'T-2' });
-  g1.record({ ...call, key: 'T-2', usage: { input_tokens: 0, output_tokens: 5 }, text: 'b' });
+  g1.record(g1.check(call), { usage: { input_tokens: 0, output_tokens: 5 }, text: 'a' });
+  g1.record(g1.check({ ...call, key: 'T-2' }), { usage: { input_tokens: 0, output_tokens: 5 }, text: 'b' });
+  assert.equal(g1.ledger().spent_usd_today, 0.01); // reservations replaced by actual cost, not added to it
 
   const g2 = new SpendGuard({ limits, ledgerPath: path.join(dir, 'ledger.json'), now: () => day }); // "new process"
   assert.throws(() => g2.check({ ...call, key: 'T-3' }), (err) => err instanceof SpendBlockedError && err.code === 'DAILY_SPEND_CAP');
@@ -306,5 +305,5 @@ test('ledger records usage, cost and hashes only, never prompts or outputs', () 
   assert.ok(!raw.includes(PLANNER_SYSTEM.slice(0, 30)));
   assert.ok(!raw.includes('Add greeting module'));
   const e = JSON.parse(raw).entries[0];
-  assert.deepEqual(Object.keys(e).sort(), ['cost_usd', 'input_tokens', 'key', 'model', 'output_sha256', 'output_tokens', 'ts']);
+  assert.deepEqual(Object.keys(e).sort(), ['cost_usd', 'input_tokens', 'key', 'model', 'output_sha256', 'output_tokens', 'reserved_usd', 'ts']);
 });

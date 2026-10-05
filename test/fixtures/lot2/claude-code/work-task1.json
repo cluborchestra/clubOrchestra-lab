@@ -1,0 +1,32 @@
+{
+  "_fixture": {
+    "created": "2026-10-05",
+    "format": "claude -p --output-format json (documented result shape)",
+    "fixture": "CO-SIM-001 PASS (base -> a1…)",
+    "provenance": "hand-authored from the documented format; NOT captured from a live claude run"
+  },
+  "exit_code": 0,
+  "stdout": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 48210,
+    "duration_api_ms": 41377,
+    "num_turns": 6,
+    "result": "{\"task_id\":\"CO-SIM-001\",\"outcome\":\"PASS\",\"starting_sha\":\"0000000000000000000000000000000000000000\",\"ending_sha\":\"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"files_changed\":[\"src/co-sim-001.js\"],\"tests\":[{\"name\":\"npm test\",\"status\":\"pass\"}],\"ci\":{\"status\":\"pending\"},\"docs_synced\":true,\"risks\":[],\"blockers\":[],\"next_recommendation\":\"await CI\"}",
+    "session_id": "00000000-0000-4000-8000-000000000001",
+    "total_cost_usd": 0.2134,
+    "usage": {
+      "input_tokens": 1820,
+      "cache_creation_input_tokens": 5400,
+      "cache_read_input_tokens": 21000,
+      "output_tokens": 2350,
+      "server_tool_use": {
+        "web_search_requests": 0
+      },
+      "service_tier": "standard"
+    },
+    "permission_denials": [],
+    "uuid": "00000000-0000-4000-8000-0000000000a1"
+  }
+}

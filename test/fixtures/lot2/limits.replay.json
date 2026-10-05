@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "_README": "Lot 2 replay limits (tests only). Replay transports only; live mode is impossible (the loader refuses mode 'real' and the guard refuses any transport not marked as replay).",
+  "_PRICING_NOTE": "FAKE — not real pricing",
+
+  "mode": "replay",
+
+  "max_calls_per_task": { "planner": 4, "worker": 3 },
+  "max_output_tokens": { "planner": 2000, "worker": 8000 },
+  "loop_detect_repeats": 2,
+
+  "transport": { "max_retries": 2, "max_retry_after_s": 30, "backoff_ms": 1000 },
+  "claude_code": { "max_turns": 8, "allowed_tools": ["Read", "Edit", "Write", "Bash(npm test)", "Bash(git status)", "Bash(git diff *)", "Bash(git add *)", "Bash(git commit *)"] },
+
+  "daily_spend_cap_usd": 2.00,
+  "per_call_max_usd": 0.50,
+
+  "pricing_usd_per_mtok": {
+    "openai/gpt-replay-1": { "input": 2.00, "output": 8.00 },
+    "anthropic/claude-code-headless": { "reported_cost": true }
+  }
+}

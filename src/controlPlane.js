@@ -199,7 +199,8 @@ class ControlPlane {
 
   // ---- RUNNING: ask planner, apply policy, dispatch or gate ----------------------------------
   _stepRunning(s, tx, ctx, note) {
-    const view = Object.freeze({ completed_tasks: [...s.completed_tasks], last_verified_sha: s.last_verified_sha });
+    // last_failure: why the previous attempt failed (data only, for the planner's retry; null otherwise).
+    const view = Object.freeze({ completed_tasks: [...s.completed_tasks], last_verified_sha: s.last_verified_sha, last_failure: s.last_failure ? clone(s.last_failure) : null });
     let raw;
     try {
       raw = this.planner.nextTask(view);
@@ -401,13 +402,15 @@ class ControlPlane {
       if (err instanceof AgentHaltError) throw err; // spend/loop/output halts stop the loop, not retry it
       return `review threw: ${err.message}`;
     }
-    return isPlainObject(out) && out.verdict === 'ACCEPT' ? null : `verdict ${isPlainObject(out) ? String(out.verdict) : 'missing'}`;
+    if (isPlainObject(out) && out.verdict === 'ACCEPT') return null;
+    const reason = isPlainObject(out) && typeof out.reason === 'string' && out.reason ? ` (${out.reason.slice(0, 200)})` : '';
+    return `verdict ${isPlainObject(out) ? String(out.verdict) : 'missing'}${reason}`;
   }
 
   _completeTask(s, tx, ev, reason) {
     s.completed_tasks.push(ev.task_id);
     Object.assign(s, {
-      last_verified_sha: ev.sha, expected_sha: null, failure_count: 0, awaiting: null, pending_ci_sha: null,
+      last_verified_sha: ev.sha, expected_sha: null, failure_count: 0, awaiting: null, pending_ci_sha: null, last_failure: null,
       current_task_id: null, current_task: null, current_owner: 'planner', next_safe_action: 'plan next task',
     });
     tx('RUNNING', { event_id: ev.event_id, task_id: ev.task_id, reason });
@@ -416,7 +419,7 @@ class ControlPlane {
   // Failure path + circuit breaker.
   _fail(s, tx, ctx, note, ev, errors) {
     s.failure_count += 1;
-    Object.assign(s, { awaiting: null, pending_ci_sha: null });
+    Object.assign(s, { awaiting: null, pending_ci_sha: null, last_failure: { task_id: ev.task_id, event_id: ev.event_id, errors: [...errors] } });
     tx('FAILED', { event_id: ev.event_id, task_id: ev.task_id, reason: `evidence rejected: ${errors.join('; ')}` });
     if (s.failure_count >= this.breakerThreshold) {
       this._escalate(s, tx, ctx, note, {

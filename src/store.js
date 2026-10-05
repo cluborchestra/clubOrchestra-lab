@@ -28,6 +28,7 @@ function initialState({ project_id, repo, branch, base_sha }) {
     last_verified_sha: base_sha,
     last_event_id: null,
     failure_count: 0,
+    last_failure: null,
     next_safe_action: null,
     completed_tasks: [],
     inbox_cursor: 0,

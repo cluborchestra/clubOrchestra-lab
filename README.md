@@ -12,20 +12,32 @@ clubOrchestra control plane with simulated workers.
   the Product Owner enables it. First live run done: see CURRENT_STATUS.
 - **P3 Lot 1:** agent-adapter boundary + spend/rate safety controls, with **mock** model agents.
   No real API, no keys, no cost. Secrets plan: [SECURITY_MODEL.md](SECURITY_MODEL.md).
+- **P3 Lot 2:** replay dry run with the **real API shapes**: OpenAI Responses (planner) and Claude
+  Code headless JSON (worker), served from fixtures. No live calls are possible.
 
 Canonical spec: [clubOrchestra_verkefna_og_vinnuplan_v0.1.md](clubOrchestra_verkefna_og_vinnuplan_v0.1.md).
 Status per feature: [CURRENT_STATUS.md](CURRENT_STATUS.md).
 
-**Fully offline and free:** Node.js ≥ 22, zero dependencies (no `npm install`), no network,
+**Fully offline and free:** Node.js ≥ 22, zero *production* dependencies, no network,
 no secrets, no API keys. Planner and worker are deterministic stubs. The P2a tests and harness
 also need the local `git` binary. They run it only inside scratch repos under `.tmp-test/` /
 `runs/`, with system and global git config disabled.
 
 ## Run
 
+The only dependency is the `openai` SDK, a **devDependency** used as a test judge. Install it once
+from the lockfile, without install scripts:
+
+```bash
+npm ci --ignore-scripts
+```
+
 ```bash
 npm test
 ```
+
+Every test process runs with a network trap (`test/support/no-network.js`), so any network attempt
+fails the run.
 
 ```bash
 node src/cli.js demo
@@ -219,4 +231,30 @@ ledger is `<state dir>/spend/ledger.json`.
 
 ```bash
 node --test test/p3-lot1-agents.test.js
+```
+
+## P3 Lot 2: replay dry run (real API shapes, no live calls)
+
+| Role | Adapter | Wire format | Lot 2 I/O |
+|---|---|---|---|
+| Planner | `src/agents/openaiResponses.js` | `POST /v1/responses`, strict `json_schema` (`src/agents/schemas.js`), `store: false` | injected `transport(url, init)` → replay (`src/agents/replay.js`) |
+| Worker | `src/agents/claudeCode.js` | `claude -p --output-format json --max-turns N --allowedTools …` | injected `runner(invocation)` → replay |
+
+The adapters never set an Authorization header, never read the environment, and never open
+sockets or processes. Lot 3 adds exactly one live file (`src/agents/live.js`, see
+`SECURITY_MODEL.md`).
+
+The guard (`src/agents/spendGuard.js`):
+- reserves each call's estimate before the call, under a ledger lock;
+- books the actual cost afterwards: usage × price for the planner, `total_cost_usd` for the worker;
+- halts if the cost is unknown.
+
+The daily cap is a UTC day.
+
+Fixtures are in `test/fixtures/lot2/` (regenerate with `node test/fixtures/lot2/build-fixtures.js`).
+The replay limits use **FAKE** prices, and the loader refuses non-mock prices that aren't marked
+`"FAKE — not real pricing"`.
+
+```bash
+node --test test/p3-lot2-replay.test.js test/p3-lot2-sdk-judge.test.js
 ```

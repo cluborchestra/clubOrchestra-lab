@@ -1,0 +1,75 @@
+{
+  "_fixture": {
+    "created": "2026-10-05",
+    "sdk": "openai@7.28.0",
+    "api": "POST /v1/responses (OpenAI Responses API)",
+    "fixture": "plan#0 -> CO-SIM-001 handoff",
+    "provenance": "hand-authored from the documented response shape; NOT captured from a live API"
+  },
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "x-request-id": "req_replay_resp_replay_plan0"
+  },
+  "body": {
+    "id": "resp_replay_plan0",
+    "object": "response",
+    "created_at": 1791244800,
+    "status": "completed",
+    "background": false,
+    "error": null,
+    "incomplete_details": null,
+    "instructions": "(planner instructions; omitted in fixture)",
+    "max_output_tokens": 2000,
+    "metadata": {},
+    "model": "gpt-replay-1",
+    "output": [
+      {
+        "type": "message",
+        "id": "msg_replay_plan0",
+        "status": "completed",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "{\"task\":{\"task_id\":\"CO-SIM-001\",\"action\":\"implement\",\"objective\":\"Add greeting module\",\"why\":\"Step 1 of 2 of the simulated plan\",\"repo\":\"cluborchestra/clubOrchestra-lab\",\"branch_policy\":\"feature branch -> PR; no direct main commits\",\"starting_sha\":\"0000000000000000000000000000000000000000\",\"allowed_scope\":[\"sim workspace\"],\"forbidden_scope\":[\"network\",\"secrets\",\"other repos\"],\"acceptance_criteria\":[\"Add greeting module is done\"],\"required_tests\":[\"unit\"],\"security_boundaries\":[\"offline\",\"no secrets\"],\"documentation_requirements\":[\"CURRENT_STATUS updated\"],\"evidence_required\":[\"test output\",\"ending_sha\"],\"return_format\":\"from-worker v1\"}}",
+            "annotations": [],
+            "logprobs": []
+          }
+        ]
+      }
+    ],
+    "parallel_tool_calls": true,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": null,
+      "summary": null
+    },
+    "service_tier": "default",
+    "store": false,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "json_schema",
+        "name": "co_plan",
+        "strict": true
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_p": 1,
+    "truncation": "disabled",
+    "usage": {
+      "input_tokens": 1500,
+      "input_tokens_details": {
+        "cached_tokens": 0
+      },
+      "output_tokens": 350,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "total_tokens": 1850
+    },
+    "user": null
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "_fixture": {
+    "created": "2026-10-05",
+    "sdk": "openai@7.28.0",
+    "api": "POST /v1/responses (OpenAI Responses API)",
+    "fixture": "429 rate limit, retry-after 3600s (beyond our cap)",
+    "provenance": "hand-authored from the documented response shape; NOT captured from a live API"
+  },
+  "status": 429,
+  "headers": {
+    "content-type": "application/json",
+    "retry-after": "3600"
+  },
+  "body": {
+    "error": {
+      "message": "Rate limit reached for requests",
+      "type": "requests",
+      "param": null,
+      "code": "rate_limit_exceeded"
+    }
+  }
+}

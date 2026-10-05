@@ -1,6 +1,6 @@
 # CURRENT_STATUS — clubOrchestra-lab
 
-**Updated:** 2026-10-05 · **Tasks:** CO-P1-001, CO-P2a-001, CO-P2b-001, CO-P3-LOT1-001 · **Phase:** P3 Lot 1 (agent adapters + spend controls, mock only)
+**Updated:** 2026-10-05 · **Tasks:** CO-P1-001, CO-P2a-001, CO-P2b-001, CO-P3-LOT1-001, CO-P3-LOT2-001 · **Phase:** P3 Lot 2 (replay dry run with real API shapes; no live calls)
 Tags: PLANNED / IMPLEMENTED / TESTED / E2E_VERIFIED / DISABLED (spec §8).
 TESTED = covered by an automated test in `test/` that passes with `npm test`.
 
@@ -37,7 +37,7 @@ pass on GitHub Actions (CI run 37355805656), and the live P2b run below used it 
 | 6 | Local harness: whole chain offline, no human "continue" | TESTED | `harness/` | `full local chain: …`, `deterministic: …` |
 | — | CI failure + planner-review rejection go through the circuit breaker | TESTED | `src/controlPlane.js` | `CI failure …`, `planner review REJECT …` |
 | — | `ingest` CLI (what the orchestrator workflow runs) | TESTED | `src/cli.js`, `src/ingest.js` | `cli ingest: …` |
-| 7 | Full suite green (now 71: P1 31 + P2a 19 + P2b 5 + P3 Lot 1 16) | TESTED | — | `npm test` |
+| 7 | Full suite green (now 106: P1 31 + P2a 19 + P2b 5 + P3 Lot 1 16 + P3 Lot 2 35) | TESTED | — | `npm test` |
 | 8 | Offline: no network modules; harness spawns only local `git` | TESTED | — | `offline: …` ×2 |
 
 ## P2b — GitHub wiring + first live run (CO-P2b-001)
@@ -110,21 +110,76 @@ the workflows or `orchestra-state`.
 | — | Spend ledger stores counts, tokens, cost and hashes only, never prompts or outputs | TESTED | `src/agents/spendGuard.js` | `ledger records …` |
 
 ### Still to do
-- **Lot 2: real API shape, mocked responses. Free, no keys.**
-  - Add request/response mappers for the OpenAI Responses API (Structured Outputs schema for the
-    handoff) and the Anthropic / Claude Code headless JSON output.
-  - Replay recorded-format fixture responses through the same `AgentPlanner`/`AgentWorker`.
-  - Map real usage fields into the guard's cost accounting, and handle error and timeout paths
-    (counted calls, no double spend).
-  - Add a token estimator that matches each provider's counting closely enough for the pre-call
-    estimate.
+- **Lot 2:** done, see the next section.
 - **Lot 3: arm real agents. Costs money, needs Product Owner approval.**
-  - The real clients get their keys from the GitHub environment `agents` (see `SECURITY_MODEL.md`).
+  - The real clients get their keys from the GitHub environments `agents-planner` / `agents-worker` (see `SECURITY_MODEL.md`).
   - Product Owner sets the real caps and prices in `config/agent-limits.json`, and sets
     provider-side budgets.
   - Allow `mode: real` in the loader.
   - Wire `outbox/` → `repository_dispatch` → a worker workflow.
   - First supervised one-task run.
+
+## P3 Lot 2 — replay dry run with the real API shapes (CO-P3-LOT2-001)
+
+**P3 Lot 2: IMPLEMENTED + TESTED (local).** This lot is replay only. Live mode is impossible: there
+is no live transport or runner in the code, the loader refuses `mode: real`, and the guard refuses
+any transport not marked as replay. There was no network traffic, no key was read, no `claude` was
+run, and nothing was spent.
+
+**Decisions applied:**
+- **D-A:** production code stays zero-dependency. The `openai` SDK is a devDependency, used only as
+  the test judge.
+- **D-B:** the worker is Claude Code headless JSON.
+
+**Dependency record (the one approved download):**
+- `openai@7.28.0`, installed 2026-10-05 with
+  `npm install --save-dev --save-exact --ignore-scripts openai`;
+- `resolved https://registry.npmjs.org/openai/-/openai-7.28.0.tgz`;
+- `integrity sha512-HSY4fFLflQGYe2kvO0atm6/GzhD61gpyiOZZUvO4nptMUhuB1to2K3wwFpFqc5gfEK0SxyIIFiu1yE2MtygWcA==`;
+- no transitive packages. Its optional peers (AWS/Smithy/ws/zod) are not installed and not used.
+- CI runs `npm ci --ignore-scripts` before `npm test`.
+
+| # | Case | Status | Proof |
+|---|---|---|---|
+| — | Planner adapter: raw HTTP to `POST /v1/responses` (strict `json_schema`, `store:false`) via an **injected transport**; no Authorization header | TESTED | `src/agents/openaiResponses.js`; SDK judge: `golden request …` ×2 |
+| — | Worker adapter: `claude -p --output-format json` invocation via an **injected runner**; cost = `total_cost_usd` | TESTED | `src/agents/claudeCode.js` |
+| — | Fixtures: 14 OpenAI + 8 Claude Code, each with a header (date, SDK version, "hand-authored, not captured live"); OpenAI ones checked against SDK parsing and error classes | TESTED | `test/fixtures/lot2/`; `test/p3-lot2-sdk-judge.test.js` (16) |
+| 1 | Happy path → planner ACCEPT ×2 → COMPLETE, no "continue" | TESTED | `test/p3-lot2-replay.test.js` #1 |
+| 2 | Planner REJECT → reason fed back to the planner → new attempt passes within limits | TESTED | #2 |
+| 3 | Malformed JSON / schema violation (planner and worker) → fail closed, billed cost booked | TESTED | #3 |
+| 4 | `incomplete` / `max_output_tokens` → halt, no retry | TESTED | #4 |
+| 5 | Refusal → halt | TESTED | #5 |
+| 6 | 429 + retry-after → waits exactly that long and retries; beyond `max_retry_after_s` → halt without waiting | TESTED | #6 |
+| 7 | 5xx / timeout → bounded retries (2, backoff 1s/2s) then halt; recovery; 401 never retried; worker timeout; worker `is_error` subtypes; missing cost → `COST_UNKNOWN` | TESTED | #7, #7b, #7c |
+| 8 | Spend cap reached mid-loop → refused before the call, reason recorded | TESTED | #8 |
+| 9 | Loop detector → halt (breaker tripped) | TESTED | #9 |
+| 10 | Token accounting: usage × FAKE price table, and reported `total_cost_usd`, = expected spend | TESTED | #10 |
+| 11 | Only a push to `co/**` drives the loop. The three filter layers are quoted from the files: `ci.yml` triggers, orchestrator job `if:`, adapter branch filter | EVIDENCE | #11 (static) |
+| 12 | Spend survives restarts: every step as a fresh instance still stops at the cap | TESTED | #12 |
+| 13 | Concurrent processes cannot jointly overshoot the cap (ledger lock + reservation) | TESTED | #13 |
+| — | Network trap armed for the **whole suite**; API keys never read even when present; live transport refused | TESTED | `test/support/no-network.js` via `test/helpers.js`; 3 safety tests |
+
+**PM questions:**
+- **Q1, where `spent_usd_today` lives:** `<state>/spend/ledger.json`, which on GitHub is
+  `orchestra-state`, committed with the state. It persists across Actions runs (test 12).
+  Concurrent spenders on one host are excluded by the lock + reservation (test 13). Across runs,
+  the orchestrator's `concurrency` group serialises them. See `SECURITY_MODEL.md` §4a, which also
+  covers the residual risk of a rejected push.
+- **Q2, `failure_count` 3 after 2 worker calls:** intentional. A repeated output trips the breaker
+  (`SECURITY_MODEL.md` §4b).
+- **Q3, the day boundary:** UTC; the daily cap resets at 00:00 UTC (tested; documented in
+  `config/agent-limits.json` and `SECURITY_MODEL.md` §4a).
+
+**Also changed in Lot 2:**
+- Spend is reserved before each call and settled after it (it was booked after the call in Lot 1).
+- The planner gets `last_failure` as feedback (new state field `last_failure`, ignored by the sims).
+- The review reason appears in the rejection message.
+- `AgentPlanner.review()` returns `{ verdict, reason }`.
+- `SECURITY_MODEL.md` §2 is corrected: the planner key goes to the orchestrator's `ingest` job
+  (environment `agents-planner`), and the worker key goes only to the worker job
+  (`agents-worker`).
+- Lot 1 tests: three assertions were updated for the new APIs (`record(ticket, …)`, the
+  `reserved_usd` entry field, the review `reason`). They are as strict as before.
 
 ## Known limitations
 
@@ -160,3 +215,11 @@ the workflows or `orchestra-state`.
   that same group.
 - P3 Lot 1: pre-call estimates use `max_output_tokens` for output (worst case). With the default
   mock pricing everything is 0 USD; real accuracy is a Lot 2 item.
+- P3 Lot 2: the fixtures are hand-authored from the documented formats. The OpenAI ones are
+  checked against `openai@7.28.0` parsing and error classes. The Claude Code ones cannot be checked
+  against a tool without running `claude` (forbidden), so the exact `--allowedTools` syntax and exit
+  codes must be confirmed in Lot 3.
+- P3 Lot 2: the worker output must be a bare JSON object. If real Claude Code wraps it in prose or a
+  code fence, it fails closed (`INVALID_OUTPUT`); Lot 3 may need a strict extractor.
+- P3 Lot 2: the planner token estimate is about 3 bytes per token plus 32, which is deliberately
+  conservative. Real usage replaces it after each call.
