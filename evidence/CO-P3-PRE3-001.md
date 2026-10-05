@@ -189,4 +189,8 @@ p3-lot2-replay 19 · p3-lot2-sdk-judge 16 · p3-pre3 23 (ný) · single-writer 3
    tilvik.
 
 ## Push
-_(fyllt út eftir push)_
+- `git push -u origin feat/co-p3-pre3-001`: ný remote-grein, haus `c0b0bb5` (kóði `16025a1` +
+  evidence). Auðkenni er `cluborchestra` með noreply-netfangi.
+- **Engin Actions-keyrsla ræstist:** heildarfjöldinn var 5 fyrir push og 5 mínútu eftir.
+- **Óbreytt á remote:** `main` = `1597f1b`, `orchestra-state` = `66cee56`,
+  `co/CO-SIM-001` = `d59516a`. Engin ný `co/` grein.
