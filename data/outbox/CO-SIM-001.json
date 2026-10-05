@@ -1,0 +1,35 @@
+{
+  "task_id": "CO-SIM-001",
+  "action": "implement",
+  "objective": "Add greeting module",
+  "why": "Step 1 of 2 of the simulated plan",
+  "repo": "cluborchestra/clubOrchestra-lab",
+  "branch_policy": "feature branch -> PR; no direct main commits",
+  "starting_sha": "1597f1b55ebb77f5e2f72be4928f565d52320952",
+  "allowed_scope": [
+    "sim workspace"
+  ],
+  "forbidden_scope": [
+    "network",
+    "secrets",
+    "other repos"
+  ],
+  "acceptance_criteria": [
+    "Add greeting module is done"
+  ],
+  "required_tests": [
+    "unit"
+  ],
+  "security_boundaries": [
+    "offline",
+    "no secrets"
+  ],
+  "documentation_requirements": [
+    "CURRENT_STATUS updated"
+  ],
+  "evidence_required": [
+    "test output",
+    "ending_sha"
+  ],
+  "return_format": "from-worker v1"
+}

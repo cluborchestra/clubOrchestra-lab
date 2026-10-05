@@ -1,21 +1,55 @@
 {
   "schema_version": 1,
-  "version": 0,
+  "version": 3,
   "project_id": "clubOrchestra-lab",
-  "status": "IDLE",
-  "current_task_id": null,
-  "current_task": null,
-  "current_owner": null,
-  "awaiting": null,
-  "pending_ci_sha": null,
+  "status": "WAITING_EVENT",
+  "current_task_id": "CO-SIM-001",
+  "current_task": {
+    "task_id": "CO-SIM-001",
+    "action": "implement",
+    "objective": "Add greeting module",
+    "why": "Step 1 of 2 of the simulated plan",
+    "repo": "cluborchestra/clubOrchestra-lab",
+    "branch_policy": "feature branch -> PR; no direct main commits",
+    "starting_sha": "1597f1b55ebb77f5e2f72be4928f565d52320952",
+    "allowed_scope": [
+      "sim workspace"
+    ],
+    "forbidden_scope": [
+      "network",
+      "secrets",
+      "other repos"
+    ],
+    "acceptance_criteria": [
+      "Add greeting module is done"
+    ],
+    "required_tests": [
+      "unit"
+    ],
+    "security_boundaries": [
+      "offline",
+      "no secrets"
+    ],
+    "documentation_requirements": [
+      "CURRENT_STATUS updated"
+    ],
+    "evidence_required": [
+      "test output",
+      "ending_sha"
+    ],
+    "return_format": "from-worker v1"
+  },
+  "current_owner": "worker",
+  "awaiting": "ci",
+  "pending_ci_sha": "d59516afd4ea199bf3f7232772eda3d5b88950b9",
   "lease_until": null,
-  "repo": "clubOrchestra-lab",
+  "repo": "cluborchestra/clubOrchestra-lab",
   "branch": "main",
-  "expected_sha": null,
-  "last_verified_sha": "0000000000000000000000000000000000000000",
-  "last_event_id": null,
+  "expected_sha": "1597f1b55ebb77f5e2f72be4928f565d52320952",
+  "last_verified_sha": "1597f1b55ebb77f5e2f72be4928f565d52320952",
+  "last_event_id": "evt-worker-CO-SIM-001-d59516afd4ea",
   "failure_count": 0,
-  "next_safe_action": null,
+  "next_safe_action": "await ci.completed for d59516afd4ea199bf3f7232772eda3d5b88950b9",
   "completed_tasks": [],
-  "inbox_cursor": 0
+  "inbox_cursor": 1
 }

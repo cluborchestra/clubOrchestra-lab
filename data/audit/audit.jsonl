@@ -1,0 +1,4 @@
+{"ts":"2026-10-05T18:34:07.598Z","actor":"human:cluborchestra (B3 approved)","event_id":null,"task_id":null,"kind":"transition","from":"IDLE","to":"RUNNING","reason":"start"}
+{"ts":"2026-10-05T18:34:07.602Z","actor":"operator:b3-prep","event_id":null,"task_id":"CO-SIM-001","kind":"transition","from":"RUNNING","to":"WAITING_EVENT","reason":"dispatched CO-SIM-001 to worker"}
+{"ts":"2026-10-05T18:34:07.602Z","actor":"operator:b3-prep","event_id":null,"task_id":"CO-SIM-001","kind":"task_dispatched","starting_sha":"1597f1b55ebb77f5e2f72be4928f565d52320952"}
+{"ts":"2026-10-05T18:34:07.610Z","actor":"operator:b3-prep","event_id":"evt-worker-CO-SIM-001-d59516afd4ea","task_id":"CO-SIM-001","kind":"worker_evidence_accepted","sha":"d59516afd4ea199bf3f7232772eda3d5b88950b9","reason":"awaiting CI on exact sha"}
