@@ -24,7 +24,8 @@ raunverulegir agentar eru til, engir lyklar, og eytt hefur verið 0 USD.
 | P3 Lot 2 | ACCEPTED |
 | P3 Lot 2b + escalation + skjölun | ACCEPTED |
 | PRE3 (verndaðar slóðir, `/approve`, fest CLI) | ACCEPTED (2026-10-06) |
-| PRE3b (vörnin ver sjálfa sig: `src/**`, `test/support/**`, `.gitattributes`, `.gitmodules`) | Í QA: 146/146 próf græn |
+| PRE3b (vörnin ver sjálfa sig: `src/**`, `test/support/**`, `.gitattributes`, `.gitmodules`) | ACCEPTED (2026-10-06) |
+| CO-P3-FREE-001 (frí leið: Claude Max + ChatGPT/Codex) | STOPP: Codex CLI ekki uppsett; bíður ákvörðunar Ása |
 
 Tvítekningarprófið er VERIFIED í dry-run; live-útgáfan er frestuð (B5).
 
@@ -33,7 +34,7 @@ Tvítekningarprófið er VERIFIED í dry-run; live-útgáfan er frestuð (B5).
 - **`docs/co-p2b-e2e-status`:** pushuð; PR ekki staðfest.
 
 ## NOW
-QA á PRE3b ([evidence](../evidence/CO-P3-PRE3B-001.md)).
+CO-P3-FREE-001: könnun búin; HART STOPP á Codex-hlið ([evidence](../evidence/CO-P3-FREE-001.md)). 1a Claude-áskrift: GO staðbundið með fyrirvara. 1b Codex: NO-GO (ekki uppsett). 1c CI með áskrift: óstaðfest og öryggisákvörðun.
 
 ## NEXT
 1. Opna og mergea eina PR-ið (`feat/co-p3-pre3-001 → main`, merge commit) þegar Actions er stöðugt. Þá virkjast `approval.yml`.
@@ -55,6 +56,7 @@ B5: live tvítekningarpróf bíður heilbrigðra GitHub runners.
 2. Merge á biðgreinum.
 3. Tímasetning B5.
 4. Approvers-listi (í dag aðeins `cluborchestra`).
+5. **Frí leið:** leyfa uppsetningu Codex CLI (frítt niðurhal); velja útgáfufestingu Claude (skrifborðsforritið uppfærir sig sjálft: 2.1.286 → 2.1.289); ákveða hvort áskriftarlyklar megi fara í CI (öryggi).
 
 ## IMPORTANT BOUNDARIES
 - Ekkert kostar án „já“ frá Ása.
