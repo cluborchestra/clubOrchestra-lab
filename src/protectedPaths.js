@@ -10,9 +10,17 @@ const path = require('node:path');
 //
 // The floor below is hard-coded. config/protection.json may ADD paths, never remove them (and
 // config/** is itself protected, so a worker cannot edit that list).
+// PRE3b: the guard protects itself. All of src/ (this file, gitDiff.js, ownerCommands.js,
+// controlPlane.js, states.js, ...) and the test support code are protected, plus git attribute and
+// submodule files, which change how paths and content are interpreted. Worker tasks in this repo write
+// to work/. The specific src/ entries below are kept on purpose: they name the core rules explicitly.
 const FLOOR = Object.freeze([
   '.github/**',
   'config/**',
+  'src/**',
+  'test/support/**',
+  '.gitattributes',
+  '.gitmodules',
   'src/escalation.js',
   'src/agents/spendGuard.js',
   'src/agents/limits.js',

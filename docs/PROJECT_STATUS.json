@@ -1,6 +1,6 @@
 {
   "status_schema_version": 1,
-  "updated_at": "2026-10-05",
+  "updated_at": "2026-10-06",
   "project": "clubOrchestra",
   "canonical_plan": "docs/clubOrchestra_verkefna_og_vinnuplan.md",
   "repository": "https://github.com/cluborchestra/clubOrchestra-lab",
@@ -24,7 +24,7 @@
     "agents": "simulated only; no API keys exist; no live transport in code",
     "spend_to_date_usd": 0
   },
-  "current_work_package": "CO-P3-PRE3-001",
+  "current_work_package": "CO-P3-PRE3B-001",
   "capability_matrix": {
     "control_plane_p1": {
       "state": "LIVE",
@@ -96,14 +96,21 @@
     "protected_paths_real_diff": {
       "state": "READY_NOT_DEPLOYED",
       "merged": false,
-      "accepted": false,
+      "accepted": true,
       "branch": "feat/co-p3-pre3-001",
-      "live_run": false
+      "live_run": false,
+      "floor_includes": [
+        "src/**",
+        "test/support/**",
+        ".gitattributes",
+        ".gitmodules"
+      ],
+      "accepted_note": "PRE3 accepted 2026-10-06 with condition PRE3b (in QA)"
     },
     "owner_approve_deny_in_issue": {
       "state": "READY_NOT_DEPLOYED",
       "merged": false,
-      "accepted": false,
+      "accepted": true,
       "branch": "feat/co-p3-pre3-001",
       "live_run": false,
       "note": "issue_comment workflows run only from main"
@@ -111,7 +118,7 @@
     "pinned_claude_code_cli": {
       "state": "READY_NOT_DEPLOYED",
       "merged": false,
-      "accepted": false,
+      "accepted": true,
       "version": "2.1.286",
       "workflow": ".github/workflows/worker.yml",
       "enabled": false
@@ -119,8 +126,8 @@
   },
   "tests": {
     "local": {
-      "total": 143,
-      "passed": 143,
+      "total": 146,
+      "passed": 146,
       "failed": 0,
       "branch": "feat/co-p3-pre3-001",
       "network_trap": true
@@ -135,11 +142,6 @@
   },
   "branches_pending_merge": [
     {
-      "branch": "docs/co-p2b-e2e-status",
-      "head": "2c363ae",
-      "pr": "not verified"
-    },
-    {
       "branch": "feat/co-p3-pre3-001",
       "contains": [
         "2c363ae",
@@ -147,22 +149,23 @@
         "1dee952",
         "83e3762",
         "d0acf8f",
-        "4e0c8d0"
+        "4e0c8d0",
+        "16025a1"
       ],
-      "supersedes_branch": "feat/co-p3-lot2b-async",
-      "pr": "not opened"
+      "pr": "prepared (not opened, not merged); Product Owner opens/approves when GitHub Actions is stable",
+      "also_covers": "docs/co-p2b-e2e-status"
     }
   ],
   "priorities": [
-    "PM/QA review of CO-P3-PRE3-001",
-    "Merge docs branch, then the stacked P3 branch, into main (merge commit)",
+    "PM/QA review of PRE3b",
+    "One PR feat/co-p3-pre3-001 -> main when GitHub Actions is stable (merge commit)",
     "Lot 3 only after Product Owner approval"
   ],
   "next_steps": [
     {
       "id": "merge",
       "owner": "Product Owner",
-      "action": "open/merge PRs for docs/co-p2b-e2e-status and feat/co-p3-pre3-001 (merge commit); approval.yml becomes active after merge"
+      "action": "open the prepared PR feat/co-p3-pre3-001 -> main and merge with a merge commit when GitHub Actions is stable; approval.yml becomes active after merge"
     },
     {
       "id": "lot3",
@@ -208,10 +211,11 @@
       "P2b",
       "P3-Lot1",
       "P3-Lot2",
-      "P3-Lot2b"
+      "P3-Lot2b",
+      "P3-PRE3"
     ],
     "in_review": [
-      "P3-PRE3"
+      "P3-PRE3b"
     ],
     "next": [
       "P3-Lot3"
@@ -237,5 +241,9 @@
     "branch_policy": "feature branch + PR; main protected; no co/ push without per-run approval",
     "spend_controls": "SpendGuard reservation before every call, UTC daily cap, default mode mock with 0 USD caps",
     "protected_paths": "real git diff base..head checked by the control plane; touching a protected path = OWNER/security, result held until the owner decides"
-  }
+  },
+  "lot3_followups": [
+    "B8: resume after /approve (repository_dispatch from approval workflow)",
+    "job-level concurrency for ingest + watchdog (SECURITY_MODEL 4a)"
+  ]
 }

@@ -145,7 +145,11 @@ example). This is intentional, not a counting error:
 
 ## 4c. Protected paths, owner commands, pinned CLI (PRE3)
 - **Protected paths** (`src/protectedPaths.js`): the worker must never change its own rules.
-  - **The floor is hard-coded:** `.github/**`, `config/**`, `src/escalation.js`,
+  - **The floor is hard-coded, and the guard protects itself (PRE3b):** `src/**` (including
+    `protectedPaths.js`, `gitDiff.js`, `ownerCommands.js`, `controlPlane.js`, `states.js`),
+    `test/support/**`, `.gitattributes` and `.gitmodules` (they change how git interprets paths
+    and content). Worker tasks write to `work/`. The core rules are also listed by name:
+    `.github/**`, `config/**`, `src/escalation.js`,
     `src/agents/spendGuard.js`, `src/agents/limits.js`, `src/agents/live.js`, `src/fileLock.js`,
     `test/support/no-network.js`, `package.json`, `package-lock.json`, `docs/PROJECT_STATUS.json`,
     `docs/CLUB_DOCUMENTATION_STANDARD.md`.

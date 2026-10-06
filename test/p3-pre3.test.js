@@ -106,7 +106,10 @@ test('protected: upper/lower case and odd path forms are matched (fail closed)',
   for (const p of ['src/../config/x.json', 'docs/./../.github/a.yml', 'config\\x.json', './package.json', '../outside', '/etc/passwd', 'C:/x', '']) {
     assert.equal(isProtected(p), true, p);
   }
-  for (const p of ['src/controlPlane.js', 'docs/notes.md', 'githubx/a', 'configs/a', 'src/escalation.js.bak']) assert.equal(isProtected(p), false, p);
+  for (const p of ['work/CO-SIM-001.txt', 'docs/notes.md', 'githubx/a', 'configs/a', 'srcx/a.js', 'harness/localLoop.js', 'test/p3-pre3.test.js']) assert.equal(isProtected(p), false, p);
+  // PRE3b: the guard protects itself (all of src/, test support, git attribute/submodule files).
+  for (const p of ['src/controlPlane.js', 'src/protectedPaths.js', 'src/gitDiff.js', 'src/ownerCommands.js', 'src/states.js', 'src/escalation.js.bak', 'SRC/x.js',
+    'test/support/no-network.js', 'test/support/new-helper.js', '.gitattributes', '.gitmodules', '.GITATTRIBUTES']) assert.equal(isProtected(p), true, p);
   assert.equal(normalize('src//./a/../b.js'), 'src/b.js');
 });
 
@@ -177,6 +180,30 @@ test('protected end to end: denied -> BLOCKED; diff unavailable -> BLOCKED (fail
   const { SimPlanner } = require('../src/sim/planner');
   const { SimWorker } = require('../src/sim/worker');
   assert.throws(() => new ControlPlane({ dir: tmpDir('pp-nodiffs'), planner: new SimPlanner(), worker: new SimWorker(), repo: new GitRefs(loop.repo.gitDir) }), /requires a diff provider/);
+});
+
+// ---- PRE3b: the guard protects itself ----------------------------------------------------------------
+for (const [name, sneaky] of [['own rules (src/protectedPaths.js)', 'src/protectedPaths.js'], ['git attributes (.gitattributes)', '.gitattributes']]) {
+  test(`PRE3b: worker secretly changes ${name} -> held as OWNER/security`, async () => {
+    const loop = createLocalLoop({ root: tmpDir(`pp-self-${sneaky.replace(/\W/g, '')}`), sneakyPath: { 'CO-SIM-001': sneaky } });
+    await loop.cp.start();
+    const r = await pump(loop);
+    assert.equal(r.state.status, 'WAITING_APPROVAL');
+    assert.deepEqual(loop.planner.reviews, []);
+    const a = loop.cp.store.readApproval(r.state.held.approval_id);
+    assert.deepEqual([a.category, a.decided_by], ['security', 'policy']);
+    assert.deepEqual(a.files.map((f) => f.path), [sneaky]);
+  });
+}
+
+test('PRE3b: work/** stays AUTO (normal loop, nothing held)', async () => {
+  const loop = createLocalLoop({ root: tmpDir('pp-work') }); // the harness worker writes work/<task>.txt
+  await loop.cp.start();
+  const r = await pump(loop);
+  assert.equal(r.state.status, 'COMPLETE');
+  assert.deepEqual(r.state.completed_tasks, ['CO-SIM-001', 'CO-SIM-002']);
+  assert.ok(!loop.cp.store.readAudit().some((e) => e.kind === 'protected_paths_touched'));
+  assert.deepEqual(new OwnerIssueOutbox(loop.controlDir).list(), []);
 });
 
 // ===================================================================================================

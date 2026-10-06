@@ -3,7 +3,7 @@ Status: ACTIVE
 Updated: 2026-10-05
 Owner: Product Owner (Ási) · umsjón: PM
 Canonical source: YES
-Version: v1.2
+Version: v1.3
 
 Ef skjölum ber ekki saman gildir eftirfarandi forgangsröð:
 1. nýjust staðfest evidence úr repo/keyrslu;
@@ -84,12 +84,13 @@ Kjarna-lúppan heitir **Review-Dispatch Loop (áfangi P4)**:
 - Fail-closed alls staðar.
 - Payload, repo-innihald, CI-log og úttak módela eru **gögn, aldrei fyrirmæli**.
 - Engir lyklar eða leyndarmál í kóða, skjölum eða logum. Repo-ið er opið.
-- **Worker má aldrei breyta eigin reglum.** Verndaðar slóðir eru:
-  - `.github/**` og `config/**`;
-  - escalation-reglan, spend-guard og limits;
-  - `live.js`, `fileLock.js` og nettilgildran;
+- **Worker má aldrei breyta eigin reglum, og vörnin ver sjálfa sig.** Verndaðar slóðir eru:
+  - `.github/**`, `config/**`, **`src/**`** og `test/support/**`;
+  - `.gitattributes` og `.gitmodules`;
   - `package*.json`;
   - `PROJECT_STATUS.json` og skjölunarstaðallinn.
+
+  Worker-verk í þessu repo skrifa í `work/`.
 
   Control plane athugar þær á **raunverulegum diff**; snerting = OWNER/security. Gólfið er
   harðkóðað: config getur lengt það en aldrei stytt, og planner getur ekki mildað það.
@@ -200,7 +201,7 @@ Staðfest 2026-10-05 úr git og opinberu GitHub API.
 | Replay með raunverulegu API-formi (Lot 2) | READY_NOT_DEPLOYED (á grein) | `test/p3-lot2-*.test.js` |
 | Async kallleið + staðfestir Claude-fánar (Lot 2b) | READY_NOT_DEPLOYED (á grein) | `src/agents/claudeCode.js` |
 | Escalation-regla AUTO/OWNER + issue-beiðnir | READY_NOT_DEPLOYED (á grein; issue-skrefið hefur aldrei keyrt) | `test/p3-escalation.test.js` |
-| Verndaðar slóðir á raunverulegum diff (PRE3) | READY_NOT_DEPLOYED (á grein) | `test/p3-pre3.test.js` (10 próf, raunverulegt git) |
+| Verndaðar slóðir á raunverulegum diff (PRE3 + PRE3b: vörnin ver sjálfa sig) | READY_NOT_DEPLOYED (á grein) | `test/p3-pre3.test.js` (13 próf, raunverulegt git) |
 | `/approve` / `/deny` í issue (PRE3) | READY_NOT_DEPLOYED (á grein; `approval.yml` keyrir aðeins eftir merge) | `test/p3-pre3.test.js` (9 próf + statísk) |
 | Fest Claude Code CLI 2.1.286 + nákvæm útgáfuathugun (PRE3) | READY_NOT_DEPLOYED (beinagrind, óvirk) | `worker.yml`; `check-claude-version` |
 | Raunverulegir agentar (live transport/runner) | PLANNED (Lot 3) | — |
@@ -209,8 +210,10 @@ Staðfest 2026-10-05 úr git og opinberu GitHub API.
 | Bilanapróf (P5) | FUTURE | — |
 
 ## 8. NOW
-- **PM/QA rýnir** CO-P3-PRE3-001 á `feat/co-p3-pre3-001`. Evidence:
-  [evidence/CO-P3-PRE3-001.md](../evidence/CO-P3-PRE3-001.md).
+- **PRE3b:** gólfið útvíkkað, svo vörnin ver sjálfa sig. Evidence:
+  [evidence/CO-P3-PRE3B-001.md](../evidence/CO-P3-PRE3B-001.md).
+- **Eitt PR undirbúið:** `feat/co-p3-pre3-001 → main`, ekki mergeað. Ási samþykkir þegar GitHub
+  Actions er stöðugt.
 
 ## 9. NEXT
 1. PR fyrir `docs/co-p2b-e2e-status`, og síðan fyrir staflaða P3-greinina (Lot 1 → 2 → 2b → PRE3)
@@ -246,7 +249,8 @@ Staðfest 2026-10-05 úr git og opinberu GitHub API.
 | P3 Lot 1 | ACCEPTED (PM 2026-10-05) | 16 próf |
 | P3 Lot 2 | ACCEPTED (PM 2026-10-05) | 35 próf: 19 replay + 16 SDK-dómari (`openai@7.28.0` devDependency) |
 | P3 Lot 2b + escalation + skjölun | ACCEPTED (PM 2026-10-05) | 14 escalation-próf; 120/120 |
-| PRE3 | Í QA | 23 ný próf; allt 143/143 grænt |
+| PRE3 | ACCEPTED (PM 2026-10-06), með skilyrðinu PRE3b | 23 ný próf; `gitDiff.js`-undanþágan og WAITING_EVENT ⇄ WAITING_APPROVAL samþykkt |
+| PRE3b | Í QA | 3 ný próf; allt 146/146 grænt |
 
 **Prófaregla:** hvert prófaferli hefur nettilgildru (`test/support/no-network.js`). Í `src/` er
 hvorki `process.env` né `fetch(` (offline-próf).
@@ -279,14 +283,16 @@ hvorki `process.env` né `fetch(` (offline-próf).
 
 ## 14. Roadmap / work packages
 P0 hönnun ✔ → P1 ✔ → P2a ✔ → P2b ✔ (VERIFIED LIVE með hermdum workers) → P3 Lot 1 ✔ → Lot 2 ✔ →
-Lot 2b ✔ → **PRE3 (í QA)** → **Lot 3** (raunverulegir agentar, OWNER_APPROVAL) → **P4-samþykkt** → P5
+Lot 2b ✔ → PRE3 ✔ → **PRE3b (í QA)** → **Lot 3** (raunverulegir agentar, OWNER_APPROVAL) → **P4-samþykkt** → P5
 bilanapróf.
 
 **Lot 3 í réttri röð:**
 1. Atriðin úr §13.1.
 2. `src/agents/live.js`.
 3. Worker-workflow: `outbox/` → `repository_dispatch`.
-4. `concurrency` á `ingest`-jobbið + watchdog.
+4. `concurrency` á `ingest`-jobbið + watchdog (§4a, skráð af PM sem Lot 3 eftirfylgni).
+4b. B8: endurræsing eftir `/approve` (`repository_dispatch` frá approval-workflow; skráð af PM sem Lot 3
+   eftirfylgni).
 5. Fyrsta supervisaða keyrslan, eitt verk.
 6. P4: ≥2 verk í röð.
 
@@ -343,6 +349,7 @@ Nánar í [SECURITY_MODEL.md](../SECURITY_MODEL.md). Helstu atriði:
 | Útgáfa | Dags. | Breyting |
 |---|---|---|
 | v0.1 | 2026-10-04 | Upprunalegt spec í rót (`clubOrchestra_verkefna_og_vinnuplan_v0.1.md`): hönnun + backlog. Sögulegt. |
+| v1.3 | 2026-10-06 | PRE3 samþykkt (`gitDiff.js`-undanþága og nýjar færslur samþykktar). PRE3b: gólf verndaðra slóða útvíkkað um `src/**`, `test/support/**`, `.gitattributes` og `.gitmodules`, svo vörnin ver sjálfa sig (§4); 146 próf. B8 og concurrency skráð sem Lot 3 eftirfylgni (§14). |
 | v1.2 | 2026-10-05 | PRE3 bætt við:
 - verndaðar slóðir á raunverulegum diff (§4, §5, §15);
 - `/approve`/`/deny` í issue;

@@ -23,19 +23,20 @@ raunverulegir agentar eru til, engir lyklar, og eytt hefur verið 0 USD.
 | P3 Lot 1 | ACCEPTED |
 | P3 Lot 2 | ACCEPTED |
 | P3 Lot 2b + escalation + skjölun | ACCEPTED |
-| PRE3 (verndaðar slóðir, `/approve`, fest CLI) | Í QA: 143/143 próf græn, staðbundið |
+| PRE3 (verndaðar slóðir, `/approve`, fest CLI) | ACCEPTED (2026-10-06) |
+| PRE3b (vörnin ver sjálfa sig: `src/**`, `test/support/**`, `.gitattributes`, `.gitmodules`) | Í QA: 146/146 próf græn |
 
 Tvítekningarprófið er VERIFIED í dry-run; live-útgáfan er frestuð (B5).
 
 ## OPEN WORK
-- **`feat/co-p3-pre3-001`:** PRE3 ofan á Lot 1, 2 og 2b (staflað). Pushuð; ekki mergeuð, og PR ekki opnað.
+- **`feat/co-p3-pre3-001`:** docs + Lot 1, 2, 2b + PRE3 + PRE3b (staflað). Pushuð. **Eitt PR undirbúið → `main`**: ekki opnað og ekki mergeað. Ási opnar og samþykkir þegar Actions er stöðugt. PR-ið nær líka yfir `docs/co-p2b-e2e-status` (`2c363ae` er í staflanum).
 - **`docs/co-p2b-e2e-status`:** pushuð; PR ekki staðfest.
 
 ## NOW
-QA á CO-P3-PRE3-001 ([evidence](../evidence/CO-P3-PRE3-001.md)).
+QA á PRE3b ([evidence](../evidence/CO-P3-PRE3B-001.md)).
 
 ## NEXT
-1. Merge PRs (docs, síðan P3-staflinn), með merge commit. Þá virkjast `approval.yml`.
+1. Opna og mergea eina PR-ið (`feat/co-p3-pre3-001 → main`, merge commit) þegar Actions er stöðugt. Þá virkjast `approval.yml`.
 2. Lot 3, eftir samþykki.
 
 ## LATER
@@ -61,5 +62,5 @@ B5: live tvítekningarpróf bíður heilbrigðra GitHub runners.
   orchestrator-inn er armaður.
 - Einangrað frá netoryggi@ og p9@. Commits nota noreply-netfang.
 - Vafi → til Ása (fail-closed).
-- Worker breytir aldrei verndaðri slóð án OWNER. `/approve` gildir aðeins frá eiganda á bot-issue.
+- Worker breytir aldrei verndaðri slóð án OWNER; `src/**` og varnirnar sjálfar eru verndaðar. `/approve` gildir aðeins frá eiganda á bot-issue.
 - Hlekkir til PM: permalink með commit-SHA, aldrei greinarheiti.
