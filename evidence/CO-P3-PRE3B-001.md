@@ -107,4 +107,9 @@ Sameinar P3-staflann inn í `main`: docs (P2b live-evidence) → Lot 1 → Lot 2
 ```
 
 ## Push
-_(fyllt út eftir push)_
+- `git push origin feat/co-p3-pre3-001`: haus `7bae2d0` (kóði `eea57e4` + evidence). Auðkenni er
+  `cluborchestra` með noreply-netfangi.
+- **Engin Actions-keyrsla ræstist:** heildarfjöldinn var 5 fyrir push og 5 mínútu eftir.
+- **Opin PR:** 0. PR-ið er aðeins undirbúið, eins og beðið var um.
+- **Óbreytt á remote:** `main` = `1597f1b`, `orchestra-state` = `66cee56`,
+  `co/CO-SIM-001` = `d59516a`. Engin ný `co/` grein.
