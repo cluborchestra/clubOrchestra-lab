@@ -1,96 +1,220 @@
-# Evidence — CO-P3-FREE-001 (frí prófunarleið: könnun)
-Status: STOPPED: bíður ákvörðunar PO (sjá „Til að losa stoppið“)
-Updated: 2026-10-06
-Owner: Claude Code (könnun) · rýni: PM
-Canonical source: NO. Evidence
+# Evidence — CO-P3-FREE-001 (frí prófunarleið á núverandi áskriftum)
+Status: FOR QA
+Updated: 2026-10-07
+Owner: Claude Code (framkvæmd) · rýni: PM
+Canonical source: NO. Evidence; staðan er í docs/PROJECT_STATUS.json og docs/clubOrchestra_verkefna_og_vinnuplan.md (v1.4)
 
-**Grein:** `feat/co-p3-free-001`, ofan á `feat/co-p3-pre3-001` (`09ee10c`). **Engin kóðabreyting.**
-Engin innskráning, ekkert módelkall og enginn kostnaður. Aðeins `--version` og `--help` voru keyrð.
-Ekkert á `co/` eða í `main`.
+**Grein:** `feat/co-p3-free-001` (ofan á `feat/co-p3-pre3-001`). **Kóði og skjöl:** commit
+`d6b65140cd96567adf782e605fdd56e20945919f`.
 
-## Niðurstaða: HART STOPP fyrir lið 2 (Codex-adapter)
-**Codex CLI er ekki uppsett** á þessari vél. Ég leitaði á:
-- PATH;
-- npm global;
-- `%APPDATA%\npm`, `%LOCALAPPDATA%\Programs` og `~/.codex`;
-- Windows-pakkasafninu og `Program Files`.
+**Niðurstaða:** stoppið er losað.
+- Codex CLI er uppsett, og exec-hamur, skipulagt úttak og read-only eru staðfest í `--help`.
+- Planner-adapter fyrir `codex exec` og áskriftarhamur fyrir Claude-worker eru útfærðir og prófaðir í
+  replay.
+- Prófasvítan er **155/155 græn**, þar af 9 ný.
+- **Enginn nýr kostnaður:** engin innskráning, ekkert módelkall, engin API-inneign. Ekkert á `co/` eða
+  í `main`.
+- Staðbundin raunprófun er **aðeins plan** (liður 3, hér að neðan).
 
-ChatGPT- eða Codex-forrit fannst heldur ekki. Því er **ekkert** við `codex exec` hægt að staðfesta
-(fána, JSON-form eða innskráningarleið). Að skrifa adapter gegn óstaðfestu viðmóti brýtur reglu
-verkefnisins: fánar eru staðfestir gegn `--help` fyrir notkun. Liðir 2 og 3 voru því **ekki
-hafnir**.
+*Saga:* fyrri útgáfa þessarar skrár (2026-10-06) var HART STOPP, því Codex CLI var ekki uppsett. PM
+opnaði hliðið 2026-10-07.
 
-## 1a) Claude Code: áskriftarinnskráning með `claude -p`
+## 1) Codex CLI: uppsetning og könnun
+**Uppsetning:** opinbera npm-leiðin, pakkinn `@openai/codex`.
+- **Repo:** github.com/openai/codex; útgefandi OpenAI; Apache-2.0.
+- **Útgáfa:** nákvæmlega **0.160.1** (nýjasta stöðuga).
+- **Aðferð:** `npm install --save-exact --ignore-scripts @openai/codex@0.160.1` í
+  **`runs/tools/codex/`**. Sú mappa er inni í repo-inu og gitignored. Ekkert er sett upp globalt og
+  ekkert utan verkefnisins er snert.
+- **Pakkar:** 2.
+  - `@openai/codex@0.160.1`: `sha512-f1yrJhwgimKQI1kYQlxdPJcFwkNZxZrbz7Hf89EAcnLqkQ7TiESzr2FgSZn13Ga5RuHjlVUfurzwq10wk9zw2g==`
+  - `@openai/codex-win32-x64@0.160.1-win32-x64`: `sha512-yyqykHtHNhm0ZViofGozz9a4ffUyXDsiyRu9Q2hPNg/cu4uzSsovNr5kDmzBXPFWAilmlZuNkwpw1W7uae2nlg==`
+- **Einangrun:** `CODEX_HOME` = `runs/tools/codex-home` (gitignored), svo ekkert var lesið úr eða
+  skrifað í `~/.codex` Ása. Sú mappa er enn ekki til.
+
+**Keyrt (aðeins):** `codex --version` (`codex-cli 0.160.1`), `codex --help`, `codex exec --help`,
+`codex login --help`, `codex logout --help` og `codex features --help`.
+
+| Spurning | Svar | Heimild |
+|---|---|---|
+| Óvirk keyrsla | **JÁ:** `codex exec` = „Run Codex non-interactively“; fyrirmæli úr stdin með `-` | `codex exec --help` |
+| Skipulagt / JSON-úttak | **JÁ:** `--output-schema <FILE>` („JSON Schema file describing the model's final response shape“), `-o/--output-last-message <FILE>` og `--json` (JSONL-atburðir) | `codex exec --help` |
+| Planner les aðeins | **JÁ:** `-s/--sandbox read-only` (val: read-only, workspace-write, danger-full-access). `--search` (vefleit) er sjálfgefið af, og við sendum það ekki. | `codex exec --help`, `codex --help` |
+| Einangrun frá stillingum Ása | **JÁ:** `--ignore-user-config` („auth still uses CODEX_HOME“), `--ignore-rules`, `--ephemeral` og `-C/--cd` | `codex exec --help` |
+| Innskráning | `codex login` hefur `--with-api-key`, `--with-access-token`, `--device-auth` og undirskipunina `status`. **Óstaðfest í help:** að `codex login` án fána sé „Sign in with ChatGPT“ (help segir það ekki berum orðum; skjölun segir að svo sé) | `codex login --help` |
+| CI með ChatGPT-aðgangi | Tæknilega mögulegt (`--with-access-token`, `CODEX_ACCESS_TOKEN`), en **NEI í bili** að ákvörðun Ása | `codex login --help` |
+
+**Adapterinn notar viljandi ekki:**
+- `--json`, því form JSONL-atburðanna er óstaðfest. Lokasvarið er lesið úr `-o`-skránni.
+- `--search`, `--add-dir` eða `--approve-for-me`.
+- neinn `--dangerously-*` fána.
+
+**1b: GO.**
+
+## 1a + 4) Claude Code á áskrift og `--safe-mode`
+Útgáfa á vélinni er **2.1.289**. Skrifborðsforritið uppfærir sig sjálft, og 2.1.286 er horfið.
 | Atriði | Niðurstaða | Heimild |
 |---|---|---|
-| Útgáfa á vélinni | **2.1.289**. Skrifborðsforritið **uppfærði sig sjálft**: 2.1.286 er horfið, 2.1.288 og 2.1.289 eru komin. Flaggasettið er eins og í 2.1.286 nema `--client-data-url` hvarf (skiptir okkur ekki). | `claude --version`; samanburður á `--help` |
-| Innskráning með áskrift | **STAÐFEST í help:** `claude auth login --claudeai` = „Use Claude subscription (default)“. `--console` = API-reikningur. | `claude auth login --help` |
-| `-p` + `--output-format json` | Til. Ekkert í help bindur `-p` við API-lykil. **Óstaðfest** að það keyri með áskrift fyrr en eitt raunkall er gert (bannað hér). | `claude --help` |
-| **`--bare` gengur EKKI** á fríu leiðinni | „Anthropic auth is strictly ANTHROPIC_API_KEY or apiKeyHelper … (OAuth and keychain are never read)“. Worker-kallið okkar notar `--bare` í dag, svo það þarf að fjarlægja það á fríu leiðinni. | `claude --help` (`--bare`) |
-| Í stað `--bare` | `--safe-mode`: slekkur á CLAUDE.md, skills, plugins, hooks, MCP og fleiru, en „**Auth** … and permissions work normally“. Það heldur prompt-injection-vörninni án API-lykils. | `claude --help` (`--safe-mode`) |
-| `--max-budget-usd` með áskrift | „Maximum dollar amount to spend on **API calls**“. **Óstaðfest** hvort það takmarki nokkuð undir áskrift. Á fríu leiðinni eru `max_calls_per_task`, loop-detector og tímamörk raunverulega vörnin. | `claude --help` |
+| Áskrift sjálfgefin | **STAÐFEST:** `claude auth login --claudeai` = „Use Claude subscription (default)“ | `claude auth login --help` |
+| `--bare` | **Bannar áskrift:** „auth is strictly ANTHROPIC_API_KEY or apiKeyHelper … (OAuth and keychain are never read)“. Ekki notað á fríu leiðinni. | `claude --help` |
+| `--safe-mode` hleður EKKI | **STAÐFEST:** CLAUDE.md, skills, uppsett plugins, hooks, MCP-þjónar, sérsniðnar skipanir og agentar, output styles, workflows o.fl. („all customizations … disabled“). „Auth … and permissions work normally“, þ.e. áskriftin virkar. | `claude --help` (`--safe-mode`) |
+| Notandastillingar (`settings.json`) | **ÓSTAÐFEST:** help segir ekki berum orðum að þær séu ekki lesnar, og „permissions work normally“ bendir til að reglur þaðan gildi. **Trygging:** `--setting-sources project`, sem hleður aðeins stillingar einnota klónsins (enga `user`/`local`), og `--strict-mcp-config` (engir MCP-þjónar). Báðir fánar eru staðfestir í help. | `claude --help` |
+| Áhrif í raunkeyrslu | Óstaðfest þar til fyrsta staðbundna keyrslan sýnir það (liður 3, skref 6) | — |
 
-**1a: GO staðbundið, með fyrirvara.** Help styður áskrift sem sjálfgefna innskráningu. Eitt
-raunverulegt `claude -p` á vél Ása staðfestir það, og það er liður 3.
+**Worker-kall á fríu leiðinni**, prófað:
+```
+claude -p --safe-mode --setting-sources project --strict-mcp-config --output-format json \
+  --permission-prompts none --allowedTools "Read,Edit,Write,Bash(npm test),Bash(git status),Bash(git diff *),Bash(git add *),Bash(git commit *)" \
+  --append-system-prompt "<WORKER_SYSTEM>"     (handoff á stdin)
+```
+`--max-budget-usd` er sleppt á áskrift. Áhrif þess eru óstaðfest, og 0-þak gæti stöðvað keyrsluna.
+Guard telur samt hvert kall.
 
-## 1b) Codex CLI
-| Atriði | Niðurstaða |
+**1a: GO staðbundið.**
+
+## 1c, 2, 3 (ákvarðanir PO)
+- **Áskriftarlyklar í CI: NEI í bili.** Skráð í PROJECT_STATUS sem ákvörðun Ása eftir staðbundna
+  prófun.
+- **Útgáfur staðbundið:** engin festing. `claude --version` og `codex --version` eru skráðar í upphafi
+  hverrar staðbundinnar keyrslu (liður 3, skref 4). Festingin gildir aðeins í CI.
+
+## 2) Adapter + replay (útfært)
+**`src/agents/codexExec.js` (`CodexExecClient`):** sama mynstur og `claudeCode.js`, með innspýttum
+runner, án ferla, `process.env` eða lykla. Kallið:
+```
+codex exec --sandbox read-only --cd {WORKDIR} --skip-git-repo-check --ephemeral --ignore-user-config --ignore-rules \
+  --output-schema {SCHEMA_FILE} --output-last-message {OUTPUT_FILE} --color never -    (fyrirmæli á stdin)
+```
+- **Skema og verð:**
+  - sama strict plan- og review-skema og Responses-adapterinn (`src/agents/schemas.js`);
+  - verðtegundin `subscription`: 0 USD á kall, en kallið er talið.
+- **Claude:** `ClaudeCodeHeadlessClient({ auth: 'subscription' })`.
+- **Valkostir sem haldast:** Responses-API-adapterinn og API-lykla-hamur Claude (`--bare`).
+- **Fixtures:** 9 í `test/fixtures/lot2/codex/`. Haus á hverri: dagsetning, `codex-cli 0.160.1`,
+  „hand-authored, NOT captured from a live codex run“.
+
+**Próf (`test/p3-free-path.test.js`, 9):**
+| Próf | Niðurstaða |
 |---|---|
-| Uppsett? | **NEI** |
-| `codex --version`, `codex exec --help` | **Ekki hægt.** Forritið er ekki til staðar |
-| `exec` (óvirk keyrsla), JSON/skipulagt úttak, innskráning með ChatGPT | **ÓSTAÐFEST.** Samkvæmt minni þekkingu á skjölun styður Codex CLI: <br>• `codex exec`; <br>• JSON-úttak (`--json`); <br>• JSON Schema fyrir lokasvar; <br>• „Sign in with ChatGPT“ fyrir Plus/Pro/Team. <br>Ekkert af því er staðfest hér, og fánaheiti geta hafa breyst. |
+| Codex-kall: nákvæmir fánar; ekkert `--json`/`--search`/`--add-dir`/`--dangerously-*`/skrifhamur; skemu = PLAN/REVIEW | ✔ |
+| Claude á áskrift: ekkert `--bare`/`--max-budget-usd`; `--safe-mode --setting-sources project --strict-mcp-config`; API-lykla-hamur óbreyttur | ✔ |
+| Full lúppa: Codex planar og rýnir, Claude vinnur, CI hliðar → COMPLETE, **0 USD**, öll köll talin | ✔ |
+| REJECT frá Codex → endurgjöf → ný tilraun | ✔ |
+| Escalation-reglan gildir (Codex: OWNER/scope → bið, enginn worker) | ✔ |
+| Texti í stað JSON, exit ≠ 0, engin `-o`-skrá, timeout → BLOCKED | ✔ |
+| 0 USD ≠ ótakmarkað: `max_calls_per_task` stöðvar **fyrir** kall | ✔ |
+| Live-runner (ekki replay) hafnað áður en ferli fer af stað | ✔ |
+| Áskriftarfærsla er ekki verð; sjálfgefin config er áfram lokuð (mock, 0 USD) | ✔ |
 
-**1b: NO-GO** þar til Codex CLI er uppsett og `--version`/`--help` lesin.
+## 5) Einnota mappa og worker-mörk (hönnun; framkvæmt í lið 3)
+- **Sérklón:** keyrslan fer fram í **sérklóni í tímabundinni möppu**,
+  `%TEMP%\co-free-<tími>\repo`, búnu til með `git clone --no-hardlinks <þetta repo>`. Klónunin er
+  staðbundin, án netumferðar. Control-plane-state fer í `%TEMP%\co-free-<tími>\control`. Ekkert er
+  skrifað í vinnumöppu Ása.
+- **Worker** (`claude`) keyrir með:
+  - cwd = klónið, án `--add-dir`;
+  - `--permission-prompts none`, svo allt sem þyrfti leyfi (t.d. skrif utan cwd) er hafnað sjálfkrafa;
+  - fastan `--allowedTools`-lista.
 
-## 1c) Áskriftarauðkenning í CI / headless
-| | Staðbundið | CI (GitHub Actions) |
-|---|---|---|
-| Claude | Já: `auth login --claudeai` er sjálfgefið (help) | **Líklega:** `claude setup-token`, „Set up a long-lived authentication token (**requires Claude subscription**)“, er staðfest í help. *Hvernig* lykillinn er notaður í CI kemur ekki fram í help, svo það er **óstaðfest**. |
-| Codex | Óstaðfest (ekki uppsett) | **Óstaðfest.** Samkvæmt minni þekkingu mælir OpenAI með API-lykli fyrir CI og ChatGPT-innskráningu fyrir staðbundna notkun |
+  Control plane athugar auk þess **verndaðar slóðir á raunverulegum diff**.
+- **Planner** (`codex`) keyrir með `--sandbox read-only --cd <klón>`.
+- **Runner** fjarlægir `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` og `CODEX_ACCESS_TOKEN` úr umhverfi
+  barnaferla. Ef lykill er til staðar gæti CLI annars notað API-reikning í stað áskriftar, og það
+  kostar.
+- **Óstaðfest takmörkun:** les-aðgangur Claude utan cwd. Skrif eru takmörkuð af leyfum, en lestur utan
+  möppunnar er ekki sannaður lokaður. Sterkari einangrun, t.d. sér Windows-notandi eða sandbox, er
+  sér ákvörðun.
 
-**Öryggisathugasemd (OWNER/security) fyrir CI-leiðina:**
-- **Áskriftarlykill nær yfir allan aðganginn.** Áskriftar- eða setup-token-lykill er ekki
-  takmarkaður við eitt verkefni eins og API-lykill. Ef hann lekur fæst aðgangur að Claude- eða
-  ChatGPT-aðgangi Ása.
-- **Repo-ið er opið.** Í CI væri slíkur lykill GitHub-secret.
-- **Kvóti:** áskriftin er einnig notuð af Ása sjálfum, svo kvótinn er sameiginlegur.
-- **Skilmálar:** það er óstaðfest hvort skilmálar áskrifta leyfi sjálfvirka CI-notkun. Það er Ása
-  að athuga.
+## 3) Plan fyrir staðbundna prófun (EKKI framkvæmt)
+**Forsenda: samþykki Ása á tveimur atriðum.**
+1. Ég byggi staðbundna runnerinn `src/agents/live.js`. Það er eina undanþegna skráin, og hún er þegar
+   vernduð. Hún ræsir `codex`/`claude`, skrifar skema- og `-o`-skrár, fjarlægir API-lykla úr
+   umhverfi og setur tímamörk.
+2. Ég byggi `harness/run-local-free.js`. Hvorugt er gert enn.
 
-**Tillaga:** frí leið = **aðeins staðbundið á vél Ása** fyrst. CI með áskriftarlyklum er sér
-ákvörðun Ása.
+**Skref fyrir Ása (einu sinni):**
+1. **Claude:** í PowerShell, `claude auth status`. Það á að sýna Claude-áskrift (claude.ai), ekki
+   Console/API. Ef ekki: `claude auth login --claudeai`.
+2. **Codex** (einangruð innskráning, ekki í `~/.codex`):
+   ```
+   $env:CODEX_HOME = "D:\Verkefni\clubOrchestra-lab\runs\tools\codex-home"
+   D:\Verkefni\clubOrchestra-lab\runs\tools\codex\node_modules\.bin\codex.cmd login
+   ```
+   Veldu innskráningu með ChatGPT í vafranum. **Ekki** `--with-api-key`. Athugaðu síðan með
+   `... codex.cmd login status`. `auth.json` lendir í `runs/tools/codex-home`, sem er gitignored og
+   fer aldrei í git.
+3. Gakktu úr skugga um að `OPENAI_API_KEY` og `ANTHROPIC_API_KEY` séu **ekki** stillt í skelinni. Runnerinn
+   fjarlægir þá líka.
 
-## 4) GO / NO-GO
+**Keyrslan (ein skipun, eitt verk):** `node harness/run-local-free.js`
+4. Skrifar `claude --version` og `codex --version` í keyrsluskrá.
+5. Býr til einnota klón + state í `%TEMP%`.
+6. **Verk:** „Create `work/CO-FREE-001.md` with the line `hello from clubOrchestra`“ (implement,
+   AUTO).
+   - Codex planar (read-only) og gefur handoff, sem control plane staðfestir.
+   - Claude vinnur í klóninum og committar á `co/CO-FREE-001`.
+   - „CI“ = `npm test` í klóninum.
+   - Codex rýnir → ACCEPT → næsta plan = ekkert → **COMPLETE**.
+7. Skilar evidence-skrá með:
+   - útgáfum;
+   - audit;
+   - ledger (köll, 0 USD);
+   - `git status` vinnumöppu Ása (á að vera óbreytt);
+   - diff klónsins.
+
+**Áætluð kvótanotkun:**
+- **Codex:** 3 köll (plan, rýni, lokaplan), mest 4, hvert með lítið inntak (nokkur þúsund tókar).
+- **Claude:** 1 `-p`-lota, mest 2, örfáar umferðir (ein skrá + commit).
+- Nákvæm tala er óstaðfest. Claude-JSON skilar `usage`, sem verður skráð. Codex gefur ekki usage í
+  `-o`, svo þar telst aðeins fjöldi kalla.
+
+**Hvernig stöðvað er:**
+- Ctrl+C hvenær sem er.
+- Sjálfvirkt BLOCKED við:
+  - hvaða villu sem er;
+  - `max_calls_per_task` (planner 4, worker 2);
+  - tímamörk (Codex 3 mín. á kall, Claude 10 mín.);
+  - loop-detector;
+  - snertingu verndaðrar slóðar.
+- Engar endurtekningar umfram mörk.
+- Að lokum má eyða `%TEMP%\co-free-*`.
+
+**„Virkar“ ef ÖLL atriðin halda:**
+- útgáfur skráðar;
+- Codex-plan stenst skema og er AUTO;
+- Claude-JSON þáttast;
+- commit er á `co/CO-FREE-001` í klóninum;
+- `npm test` er grænt í klóninum;
+- Codex ACCEPT og state = COMPLETE;
+- **vinnumappa Ása er óbreytt**;
+- engin vernduð slóð snert;
+- ledger sýnir 0 USD;
+- enginn API-lykill notaður.
+
+**„Virkar ekki“ ef eitthvað af þessu gerist** (stöðvast, evidence skrifað, ekkert reynt aftur
+sjálfkrafa):
+- auth-villa, eða CLI krefst API-lykils;
+- Codex-svar stenst ekki skema;
+- `claude -p` hafnar áskrift eða JSON-formið er annað en í fixtures;
+- worker reynir að skrifa utan klóns eða í verndaða slóð;
+- tímamörk;
+- kvóti búinn.
+
+## GO / NO-GO
 | Liður | Úrskurður |
 |---|---|
-| 1a Claude Code + áskrift | **GO (staðbundið)**, með fyrirvara um eitt raunkall. Fjarlægja þarf `--bare` og nota `--safe-mode`. |
-| 1b Codex CLI + ChatGPT | **NO-GO / HART STOPP:** ekki uppsett, ekkert staðfest |
-| 1c CI með áskrift | **Óstaðfest + öryggisákvörðun Ása.** Mælt er með staðbundinni prófun fyrst. |
+| 1a Claude Code á áskrift | **GO (staðbundið).** Áskrift sjálfgefin; `--safe-mode` í stað `--bare`; notandastillingar tryggðar með `--setting-sources project` |
+| 1b Codex CLI á ChatGPT | **GO.** Uppsett; exec, `--output-schema` og `read-only` staðfest. ChatGPT-innskráning er verk Ása (skref 2). |
+| 1c Áskrift í CI | **NEI í bili** (ákvörðun Ása) |
+| 4 `--safe-mode` | CLAUDE.md, hooks, MCP og plugins: **staðfest** óhlaðið. Notandastillingar: **óstaðfest**, tryggt með `--setting-sources project` + `--strict-mcp-config` |
+| 5 Einnota mappa | Hannað (klón í `%TEMP%`, cwd-bundinn worker, read-only planner); framkvæmt í lið 3 |
 
-## Til að losa stoppið (ákvörðun Ása; enginn kostnaður)
-1. **Leyfa uppsetningu Codex CLI.** Það er frítt niðurhal en samt niðurhal, og krefst því
-   samþykkis.
-   - Samkvæmt minni þekkingu er það `npm install -g @openai/codex` (pakkaheiti óstaðfest).
-   - Ási getur sett það upp sjálfur, eða leyft mér það.
-   - Uppsetning kallar ekki á módel. Síðan keyri ég aðeins `codex --version`, `codex --help`,
-     `codex exec --help` og `codex login --help`.
-2. **Útgáfufesting Claude:** skrifborðsforritið uppfærir sig sjálft (2.1.286 → 2.1.289 á einum
-   degi). Fyrir staðbundna prófun þarf annaðhvort:
-   - **(a)** að festa á útgáfuna sem er uppsett þann dag (`check-claude-version` les
-     `config/agent-limits.json`), eða
-   - **(b)** sérstaka fasta uppsetningu (niðurhal).
+## Staðfesting
+- **Ekkert net:** utan npm-niðurhalsins sem PM samþykkti og lestrar á npm-lýsigögnum.
+- Hvorki innskráning né módelkall.
+- Engir lyklar.
+- Prófasvítan, 155/155, keyrir með nettilgildru. `child_process` er enn aðeins í `src/gitDiff.js`.
+- Ekkert á `co/` eða í `main`. Push-niðurstaða er neðst.
 
-   Það er ákvörðun Ása.
-3. **Eftir það:** liður 2 (Codex-adapter gegn staðfestu `--help`, replay-fixtures og próf) og liður
-   3 (staðbundið prófunarplan).
-
-## Það sem var keyrt (allt les-eingöngu)
-- `claude --version` og `claude --help` (2.1.289, sha256 `a58ca2282c013122…`);
-- `claude setup-token --help`, `claude auth --help`, `claude auth login --help` og
-  `claude auth status --help`;
-- leit að `codex`: ekkert fannst.
-
-**Ekki keyrt:**
-- `claude auth status`: það les innskráningarstöðu, sem liggur utan „aðeins --help“;
-- `claude -p` og `setup-token` sjálft;
-- hvaðeina sem kallar á módel eða skráir inn.
+## Push
+_(fyllt út eftir push)_
