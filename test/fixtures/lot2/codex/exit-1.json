@@ -1,0 +1,10 @@
+{
+  "_fixture": {
+    "created": "2026-10-07",
+    "cli": "codex-cli 0.160.1",
+    "invocation": "codex exec --sandbox read-only --output-schema <schema> -o <file> -",
+    "fixture": "codex exited non-zero (e.g. not logged in)",
+    "provenance": "hand-authored final message per --output-schema; NOT captured from a live codex run"
+  },
+  "exit_code": 1
+}

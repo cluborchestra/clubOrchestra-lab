@@ -1,0 +1,13 @@
+{
+  "_fixture": {
+    "created": "2026-10-07",
+    "cli": "codex-cli 0.160.1",
+    "invocation": "codex exec --sandbox read-only --output-schema <schema> -o <file> -",
+    "fixture": "plan -> no more tasks",
+    "provenance": "hand-authored final message per --output-schema; NOT captured from a live codex run"
+  },
+  "exit_code": 0,
+  "outputs": {
+    "last_message": "{\"task\":null,\"decision\":null}"
+  }
+}

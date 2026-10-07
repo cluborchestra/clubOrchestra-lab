@@ -1,0 +1,13 @@
+{
+  "_fixture": {
+    "created": "2026-10-07",
+    "cli": "codex-cli 0.160.1",
+    "invocation": "codex exec --sandbox read-only --output-schema <schema> -o <file> -",
+    "fixture": "plan#0 -> CO-SIM-001 handoff",
+    "provenance": "hand-authored final message per --output-schema; NOT captured from a live codex run"
+  },
+  "exit_code": 0,
+  "outputs": {
+    "last_message": "{\"task\":{\"task_id\":\"CO-SIM-001\",\"action\":\"implement\",\"objective\":\"Add greeting module\",\"why\":\"Step 1 of 2 of the simulated plan\",\"repo\":\"cluborchestra/clubOrchestra-lab\",\"branch_policy\":\"feature branch -> PR; no direct main commits\",\"starting_sha\":\"0000000000000000000000000000000000000000\",\"allowed_scope\":[\"sim workspace\"],\"forbidden_scope\":[\"network\",\"secrets\",\"other repos\"],\"acceptance_criteria\":[\"Add greeting module is done\"],\"required_tests\":[\"unit\"],\"security_boundaries\":[\"offline\",\"no secrets\"],\"documentation_requirements\":[\"docs/PROJECT_STATUS.json updated\"],\"evidence_required\":[\"test output\",\"ending_sha\"],\"return_format\":\"from-worker v1\"},\"decision\":{\"class\":\"AUTO\",\"category\":null,\"reason\":\"routine task within scope\"}}"
+  }
+}

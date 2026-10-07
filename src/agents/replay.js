@@ -42,13 +42,14 @@ function makeReplayTransport(routes) {
 function makeReplayRunner(routes) {
   const queues = queueFrom(routes);
   const runner = async (invocation) => {
-    const key = invocation.meta.task_id;
+    const key = invocation.meta.route || invocation.meta.task_id;
     runner.invocations.push(invocation);
     const queue = queues[key];
     if (!queue || queue.length === 0) throw new AgentTransportError('REPLAY_MISS', `replay: nothing queued for worker ${key}`);
     const e = queue.shift();
     if (e.throw) throw thrown(e.throw);
-    return { exit_code: e.exit_code === undefined ? 0 : e.exit_code, stdout: typeof e.stdout === 'string' ? e.stdout : JSON.stringify(e.stdout), stderr: '' };
+    const stdout = e.stdout === undefined ? '' : typeof e.stdout === 'string' ? e.stdout : JSON.stringify(e.stdout);
+    return { exit_code: e.exit_code === undefined ? 0 : e.exit_code, stdout, stderr: '', outputs: { ...(e.outputs || {}) } };
   };
   runner.replay = true;
   runner.invocations = [];

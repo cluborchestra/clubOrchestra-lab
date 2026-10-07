@@ -47,10 +47,13 @@ function validateLimits(l) {
   let nonMockPrices = false;
   if (!p || typeof p !== 'object' || Array.isArray(p)) errors.push('pricing_usd_per_mtok must be an object');
   else for (const [model, price] of Object.entries(p)) {
-    if (!model.startsWith('mock/')) nonMockPrices = true;
+    // A subscription entry is not a price (0 USD per call on an existing plan), so it needs no FAKE marker.
+    if (!model.startsWith('mock/') && !(price && price.subscription === true)) nonMockPrices = true;
     const tokenPriced = price && nonNegative(price.input) && nonNegative(price.output);
     const reported = price && price.reported_cost === true && Object.keys(price).length === 1;
-    if (!tokenPriced && !reported) errors.push(`pricing_usd_per_mtok.${model} needs input/output >= 0, or reported_cost: true`);
+    // subscription: an existing flat-rate plan (free path); 0 USD per call, still counted by the guard.
+    const subscription = price && price.subscription === true && Object.keys(price).length === 1;
+    if (!tokenPriced && !reported && !subscription) errors.push(`pricing_usd_per_mtok.${model} needs input/output >= 0, reported_cost: true, or subscription: true`);
   }
   // Until real agents are approved, any non-mock price must be explicitly marked as fake.
   if (nonMockPrices && l.mode !== 'real' && l._PRICING_NOTE !== FAKE_PRICING_NOTE) {

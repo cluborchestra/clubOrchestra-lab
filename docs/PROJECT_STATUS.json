@@ -1,6 +1,6 @@
 {
   "status_schema_version": 1,
-  "updated_at": "2026-10-06",
+  "updated_at": "2026-10-07",
   "project": "clubOrchestra",
   "canonical_plan": "docs/clubOrchestra_verkefna_og_vinnuplan.md",
   "repository": "https://github.com/cluborchestra/clubOrchestra-lab",
@@ -124,19 +124,21 @@
       "enabled": false
     },
     "free_path_subscriptions": {
-      "state": "STOPPED",
-      "worker_claude_subscription": "GO locally with caveat (help: auth login --claudeai is default; --bare forbids OAuth, use --safe-mode); unverified until one real run",
-      "planner_codex_chatgpt": "NO-GO: Codex CLI not installed, nothing verified",
-      "ci_with_subscription": "unverified; OWNER/security decision",
+      "state": "IMPLEMENTED_TESTED_REPLAY",
+      "planner": "Codex CLI codex-cli 0.160.1 (installed in runs/tools/codex, gitignored); codex exec --sandbox read-only --output-schema",
+      "worker": "Claude Code on subscription: -p --safe-mode --setting-sources project --strict-mcp-config (no --bare)",
+      "cost": "subscription pricing type: 0 USD per call, calls still counted",
+      "ci_with_subscription": "NO for now (Product Owner decision after local test)",
+      "local_real_run": "PLANNED (needs approval: live runner + owner logins)",
       "evidence": "evidence/CO-P3-FREE-001.md"
     }
   },
   "tests": {
     "local": {
-      "total": 146,
-      "passed": 146,
+      "total": 155,
+      "passed": 155,
       "failed": 0,
-      "branch": "feat/co-p3-pre3-001",
+      "branch": "feat/co-p3-free-001",
       "network_trap": true
     },
     "github_ci": {
@@ -191,11 +193,6 @@
       "summary": "live duplicate-delivery test waits for healthy GitHub hosted runners",
       "since": "2026-10-05",
       "rechecked": false
-    },
-    {
-      "id": "FREE-1",
-      "summary": "Codex CLI not installed; codex exec cannot be verified; installing (free download) needs Product Owner approval",
-      "since": "2026-10-06"
     }
   ],
   "gates": [
@@ -252,13 +249,15 @@
     "approval_mechanism": "/approve or /deny in the owner-decision issue (approval.yml, after merge; strict rules in src/ownerCommands.js); data/approvals/<id>.json on orchestra-state as fallback",
     "branch_policy": "feature branch + PR; main protected; no co/ push without per-run approval",
     "spend_controls": "SpendGuard reservation before every call, UTC daily cap, default mode mock with 0 USD caps",
-    "protected_paths": "real git diff base..head checked by the control plane; touching a protected path = OWNER/security, result held until the owner decides"
+    "protected_paths": "real git diff base..head checked by the control plane; touching a protected path = OWNER/security, result held until the owner decides",
+    "no_new_cost": "hard Product Owner condition: only existing subscriptions (Claude Max = worker, ChatGPT with Codex = planner); no API credit, no new subscription"
   },
   "lot3_followups": [
     "B8: resume after /approve (repository_dispatch from approval workflow)",
     "job-level concurrency for ingest + watchdog (SECURITY_MODEL 4a)"
   ],
   "observations": {
-    "claude_code_desktop_autoupdate": "desktop-bundled Claude Code updated itself 2.1.286 -> 2.1.289 on 2026-10-06; pinned 2.1.286 check would fail locally"
+    "claude_code_desktop_autoupdate": "desktop-bundled Claude Code updated itself 2.1.286 -> 2.1.289 on 2026-10-06; pinned 2.1.286 check would fail locally",
+    "local_versions": "not pinned locally; record claude --version and codex --version at the start of every local run (pin applies to CI only)"
   }
 }

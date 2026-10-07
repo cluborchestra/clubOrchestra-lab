@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "_README": "Free-path replay limits (tests only): planner = Codex CLI on the ChatGPT subscription, worker = Claude Code on the Claude subscription. Subscription calls cost 0 USD per call and are still counted (max_calls_per_task, loop detector). Replay transports only.",
+  "mode": "replay",
+  "max_calls_per_task": {
+    "planner": 4,
+    "worker": 3
+  },
+  "max_output_tokens": {
+    "planner": 2000,
+    "worker": 8000
+  },
+  "loop_detect_repeats": 2,
+  "transport": {
+    "max_retries": 2,
+    "max_retry_after_s": 30,
+    "backoff_ms": 1000
+  },
+  "claude_code": {
+    "version": "2.1.289",
+    "allowed_tools": [
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(npm test)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  },
+  "daily_spend_cap_usd": 0,
+  "per_call_max_usd": 0,
+  "pricing_usd_per_mtok": {
+    "openai/codex-exec": {
+      "subscription": true
+    },
+    "anthropic/claude-code-subscription": {
+      "subscription": true
+    }
+  }
+}

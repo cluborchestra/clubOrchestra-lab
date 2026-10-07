@@ -87,7 +87,9 @@ class SpendGuard {
     if (!price) block('PRICING_UNKNOWN', `no price configured for ${provider}/${model}`);
     let estimate = estimate_usd;
     if (!isCost(estimate)) {
-      estimate = price.reported_cost ? this.limits.per_call_max_usd : (input_tokens * price.input + max_output_tokens * price.output) / 1e6;
+      estimate = price.subscription ? 0
+        : price.reported_cost ? this.limits.per_call_max_usd
+          : (input_tokens * price.input + max_output_tokens * price.output) / 1e6;
     }
     if (estimate > this.limits.per_call_max_usd) block('PER_CALL_CAP', `estimated ${estimate.toFixed(6)} USD > per-call cap ${this.limits.per_call_max_usd}`);
     const callKey = `${role}:${key}`;
@@ -109,7 +111,8 @@ class SpendGuard {
   record(ticket, { usage, cost_usd, text, detectLoop = true }) {
     const price = this._price(ticket.provider, ticket.model);
     let actual = null;
-    if (price.reported_cost) actual = isCost(cost_usd) ? cost_usd : null;
+    if (price.subscription) actual = 0; // flat-rate plan: no per-call cost (the call is still counted)
+    else if (price.reported_cost) actual = isCost(cost_usd) ? cost_usd : null;
     else if (usage && isCost(usage.input_tokens) && isCost(usage.output_tokens)) actual = (usage.input_tokens * price.input + usage.output_tokens * price.output) / 1e6;
     const h = text === null || text === undefined ? null : outputHash(text);
     const repeats = this._locked((l) => {

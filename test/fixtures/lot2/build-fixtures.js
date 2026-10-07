@@ -96,13 +96,31 @@ const claude = {
   'prose-result': cc('success, but result is prose instead of the JSON object', { resultText: 'Done! I implemented the module and all tests pass.', cost: 0.0990 }),
 };
 
+// Codex CLI planner (free path): what `codex exec --output-schema … -o <file>` leaves in the -o file.
+const cxHeader = (what) => ({
+  created: '2026-10-07', cli: 'codex-cli 0.160.1', invocation: 'codex exec --sandbox read-only --output-schema <schema> -o <file> -',
+  fixture: what, provenance: 'hand-authored final message per --output-schema; NOT captured from a live codex run',
+});
+const cx = (what, { lastMessage, exit = 0 }) => ({ _fixture: cxHeader(what), exit_code: exit, ...(lastMessage === undefined ? {} : { outputs: { last_message: lastMessage } }) });
+const codex = {
+  'plan-0-task1': cx('plan#0 -> CO-SIM-001 handoff', { lastMessage: plan([], SHA.base) }),
+  'plan-1-task2': cx('plan#1 -> CO-SIM-002 handoff', { lastMessage: plan(['CO-SIM-001'], SHA.a1) }),
+  'plan-done': cx('plan -> no more tasks', { lastMessage: JSON.stringify({ task: null, decision: null }) }),
+  'plan-0-owner-scope': cx('plan#0 classified OWNER/scope', { lastMessage: plan([], SHA.base, { class: 'OWNER', category: 'scope', reason: 'new feature beyond the goal' }) }),
+  'review-accept': cx('review -> ACCEPT', { lastMessage: JSON.stringify({ verdict: 'ACCEPT', reason: 'CI green on the exact sha' }) }),
+  'review-reject': cx('review -> REJECT', { lastMessage: JSON.stringify({ verdict: 'REJECT', reason: 'docs not updated' }) }),
+  prose: cx('final message is prose, not JSON', { lastMessage: 'Here is my plan: first we…' }),
+  'exit-1': cx('codex exited non-zero (e.g. not logged in)', { exit: 1 }),
+  'no-output': cx('exit 0 but no -o file written', {}),
+};
+
 module.exports = { SHA, MODEL, REPO };
 
 // Only writes when run directly; requiring this file (tests) has no side effects.
 if (require.main === module) {
-  for (const [sub, set] of [['openai', openai], ['claude-code', claude]]) {
+  for (const [sub, set] of [['openai', openai], ['claude-code', claude], ['codex', codex]]) {
     fs.mkdirSync(path.join(DIR, sub), { recursive: true });
     for (const [name, data] of Object.entries(set)) fs.writeFileSync(path.join(DIR, sub, `${name}.json`), JSON.stringify(data, null, 2) + '\n');
   }
-  console.log(`wrote ${Object.keys(openai).length} openai + ${Object.keys(claude).length} claude-code fixtures`);
+  console.log(`wrote ${Object.keys(openai).length} openai + ${Object.keys(claude).length} claude-code + ${Object.keys(codex).length} codex fixtures`);
 }
