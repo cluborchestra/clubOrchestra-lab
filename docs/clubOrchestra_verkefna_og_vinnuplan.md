@@ -3,7 +3,7 @@ Status: ACTIVE
 Updated: 2026-10-05
 Owner: Product Owner (Ási) · umsjón: PM
 Canonical source: YES
-Version: v1.4
+Version: v1.5
 
 Ef skjölum ber ekki saman gildir eftirfarandi forgangsröð:
 1. nýjust staðfest evidence úr repo/keyrslu;
@@ -204,7 +204,7 @@ Staðfest 2026-10-05 úr git og opinberu GitHub API.
 | Verndaðar slóðir á raunverulegum diff (PRE3 + PRE3b: vörnin ver sjálfa sig) | READY_NOT_DEPLOYED (á grein) | `test/p3-pre3.test.js` (13 próf, raunverulegt git) |
 | `/approve` / `/deny` í issue (PRE3) | READY_NOT_DEPLOYED (á grein; `approval.yml` keyrir aðeins eftir merge) | `test/p3-pre3.test.js` (9 próf + statísk) |
 | Fest Claude Code CLI 2.1.286 + nákvæm útgáfuathugun (PRE3) | READY_NOT_DEPLOYED (beinagrind, óvirk) | `worker.yml`; `check-claude-version` |
-| **Frí leið** (núverandi áskriftir): planner = Codex CLI (`codex exec`, read-only), worker = Claude Code á áskrift (`--safe-mode --setting-sources project --strict-mcp-config`, ekkert `--bare`) | IMPLEMENTED + TESTED (replay); staðbundin raunprófun PLANNED (bíður samþykkis) | `src/agents/codexExec.js`, `test/p3-free-path.test.js` (9) |
+| **Frí leið** (núverandi áskriftir): planner = Codex CLI (`codex exec`, read-only), worker = Claude Code á áskrift (`--safe-mode --restricted`, aðeins skráaverkfæri, slóðareglur `Read(./**)`/`Edit(./**)`, ekkert `--bare`) | IMPLEMENTED + TESTED (replay + fölsuð CLI); staðbundin raunprófun TILBÚIN, bíður þess að Ási ræsi próf 1 | `src/agents/codexExec.js`, `src/agents/live.js`, `harness/run-local-free.js`; `test/p3-free-path.test.js` (9), `test/p3-free-local.test.js` (16) |
 | Raunverulegir agentar (live transport/runner) | PLANNED (Lot 3) | — |
 | P4-samþykkt (≥2 verk í röð með raunverulegum agentum) | PLANNED | eftir Lot 3 |
 | Tilkynningar við BLOCKED / >80% af þaki (B1) | PLANNED | backlog |
@@ -214,6 +214,10 @@ Staðfest 2026-10-05 úr git og opinberu GitHub API.
 - **CO-P3-FREE-001** (frí leið á núverandi áskriftum, enginn nýr kostnaður): Codex CLI 0.160.1 sett
   upp innan repo, fánar staðfestir, adapter + replay-próf, og plan fyrir staðbundna prófun. Evidence:
   [evidence/CO-P3-FREE-001.md](../evidence/CO-P3-FREE-001.md).
+- **CO-P3-FREE-002** (staðbundinn runner + keyrsluskrifta, ekkert módelkall): `src/agents/live.js`,
+  `harness/run-local-free.js`, hamur `local-subscription`, lesbann utan klóns + lespróf,
+  innskráningar- og kvótaathugun, plan fyrir próf 2. Evidence:
+  [evidence/CO-P3-FREE-002.md](../evidence/CO-P3-FREE-002.md).
 - **Eitt PR undirbúið:** `feat/co-p3-pre3-001 → main`, ekki mergeað. Ási samþykkir þegar GitHub
   Actions er stöðugt.
 
@@ -253,7 +257,8 @@ Staðfest 2026-10-05 úr git og opinberu GitHub API.
 | P3 Lot 2b + escalation + skjölun | ACCEPTED (PM 2026-10-05) | 14 escalation-próf; 120/120 |
 | PRE3 | ACCEPTED (PM 2026-10-06), með skilyrðinu PRE3b | 23 ný próf; `gitDiff.js`-undanþágan og WAITING_EVENT ⇄ WAITING_APPROVAL samþykkt |
 | PRE3b | ACCEPTED (PM 2026-10-06) | 3 ný próf; 146/146 |
-| CO-P3-FREE-001 | Í QA | 9 ný próf; allt 155/155 grænt |
+| CO-P3-FREE-001 | ACCEPTED (PM 2026-10-07) | 9 ný próf; 155/155 |
+| CO-P3-FREE-002 | Í QA | 16 ný próf; allt 171/171 grænt; próf 1 ekki keyrt (Ási ræsir) |
 
 **Prófaregla:** hvert prófaferli hefur nettilgildru (`test/support/no-network.js`). Í `src/` er
 hvorki `process.env` né `fetch(` (offline-próf).
@@ -352,6 +357,7 @@ Nánar í [SECURITY_MODEL.md](../SECURITY_MODEL.md). Helstu atriði:
 | Útgáfa | Dags. | Breyting |
 |---|---|---|
 | v0.1 | 2026-10-04 | Upprunalegt spec í rót (`clubOrchestra_verkefna_og_vinnuplan_v0.1.md`): hönnun + backlog. Sögulegt. |
+| v1.5 | 2026-10-07 | Staðbundinn runner (`src/agents/live.js`, eina undanþegna agent-skráin; neitar CI; leyfislisti umhverfis) og keyrsluskrifta (`harness/run-local-free.js`, aðeins með `--start`). Nýr hamur `local-subscription`: aðeins áskriftarfærslur og 0 USD þak. Worker: `--restricted`, aðeins skráaverkfæri, `Read(./**)`/`Edit(./**)` (`Write(...)`-reglur eru aldrei skoðaðar skv. skjölun), `blockReadsOutsideWorkingDirectories`; runner committar og keyrir próf eftir umfangsathugun. Lespróf á kanarískrá utan klóns. Innskráningar- og kvótaathugun með skýrum stöðvunarskilaboðum. Plan fyrir próf 2. |
 | v1.4 | 2026-10-07 | Frí leið: hart skilyrði PO um engan nýjan kostnað; aðeins núverandi áskriftir (Claude Max = worker, ChatGPT/Codex = planner). Codex-adapter (`codex exec`, read-only), áskriftarhamur Claude (án `--bare`), `subscription`-verðtegund (0 USD á kall, kall talið). Engar áskriftarlyklar í CI (ákvörðun Ása). Útgáfur staðbundið: skráðar, ekki festar. |
 | v1.3 | 2026-10-06 | PRE3 samþykkt (`gitDiff.js`-undanþága og nýjar færslur samþykktar). PRE3b: gólf verndaðra slóða útvíkkað um `src/**`, `test/support/**`, `.gitattributes` og `.gitmodules`, svo vörnin ver sjálfa sig (§4); 146 próf. B8 og concurrency skráð sem Lot 3 eftirfylgni (§14). |
 | v1.2 | 2026-10-05 | PRE3 bætt við:

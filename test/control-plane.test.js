@@ -314,11 +314,27 @@ test('offline: control-plane source imports no network modules and no env secret
   // The ONE exemption (PRE3): src/gitDiff.js may start the local git binary, read-only, to compute
   // the real diff of a worker commit. It is checked separately below, not skipped.
   const GIT_DIFF = path.join(srcDir, 'gitDiff.js');
+  // The second exemption (CO-P3-FREE-002): src/agents/live.js starts the model CLIs for the owner's
+  // local free-path run. Checked separately below.
+  const LIVE = path.join(srcDir, 'agents', 'live.js');
   for (const f of files) {
     const text = fs.readFileSync(f, 'utf8');
-    if (f === GIT_DIFF) continue;
+    if (f === GIT_DIFF || f === LIVE) continue;
     assert.doesNotMatch(text, banned, f);
   }
+  const live = fs.readFileSync(LIVE, 'utf8');
+  const liveCode = live.replace(/^\s*\/\/.*$/gm, '');
+  assert.deepEqual(live.match(/require\(['"][^'"]+['"]\)/g), ["require('node:fs')", "require('node:path')", "require('node:child_process')"]);
+  assert.doesNotMatch(live, /require\(['"](node:)?(http|https|net|dgram|tls|dns|http2)['"]\)|\bfetch\(|XMLHttpRequest|WebSocket/);
+  assert.deepEqual([...liveCode.matchAll(/process\.env\b/g)].length, 2); // only the two `env = process.env` defaults
+  assert.match(liveCode, /env = process\.env, spawnImpl = spawn, maxOutputBytes/);
+  assert.match(liveCode, /env = process\.env, timeoutMs = 60000/);
+  assert.doesNotMatch(liveCode, /shell: true|\bexecSync\(|(?<![.\w])exec\(|\bfork\(/);
+  assert.equal([...liveCode.matchAll(/shell: false/g)].length, 2); // spawn + taskkill
+  assert.match(liveCode, /execFile\('taskkill', \['\/pid'/); // the only other binary: kill a timed-out tree on Windows
+  assert.match(liveCode, /if \(inCi\(env\)\) throw fail\('LOCAL_ONLY'/);
+  // Only the local run script uses it; the CLI, the orchestrator path and every other src module do not.
+  for (const f of files) if (f !== LIVE) assert.doesNotMatch(fs.readFileSync(f, 'utf8'), /require\(['"][./]*(agents\/)?live['"]\)/, f);
   const g = fs.readFileSync(GIT_DIFF, 'utf8');
   const noChildProcess = g.replace("require('node:child_process')", '');
   assert.doesNotMatch(noChildProcess, banned, 'gitDiff.js: nothing else from the banned list');

@@ -19,14 +19,8 @@
   "claude_code": {
     "version": "2.1.289",
     "allowed_tools": [
-      "Read",
-      "Edit",
-      "Write",
-      "Bash(npm test)",
-      "Bash(git status)",
-      "Bash(git diff *)",
-      "Bash(git add *)",
-      "Bash(git commit *)"
+      "Read(./**)",
+      "Edit(./**)"
     ]
   },
   "daily_spend_cap_usd": 0,

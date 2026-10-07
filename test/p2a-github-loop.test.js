@@ -296,5 +296,11 @@ test('offline: harness uses no network modules and only spawns the local git bin
     assert.doesNotMatch(text, /require\(['"](node:)?(http|https|net|dgram|tls|dns|http2)['"]\)|\bfetch\(|XMLHttpRequest|WebSocket/, f);
     for (const m of text.matchAll(/\b(?:execFile|execFileSync|spawnSync)\(\s*([^,]+),/g)) assert.equal(m[1].trim(), "'git'", f);
     assert.doesNotMatch(text, /\b(spawn|exec|execSync|fork)\(/, f);
+    // CO-P3-FREE-002: only the owner-started free-path run may use the live runner (model CLIs, node).
+    if (f !== 'run-local-free.js') assert.doesNotMatch(text, /src\/agents\/live/, f);
   }
+  const free = fs.readFileSync(path.join(dir, 'run-local-free.js'), 'utf8');
+  assert.match(free, /if \(!argv\.includes\('--start'\)\)/); // nothing starts without the explicit flag
+  assert.match(free, /if \(env\.CI \|\| env\.GITHUB_ACTIONS\) throw new RunStop\('LOCAL_ONLY'\)/);
+  assert.doesNotMatch(free, /'push'|'fetch'|'pull'|--add-dir|dangerously/);
 });

@@ -47,4 +47,17 @@ class AgentTransportError extends AgentHaltError {
   }
 }
 
-module.exports = { AgentHaltError, SpendBlockedError, LoopDetectedError, AgentOutputError, AgentTransportError };
+// Free path (CLI on a subscription): name the two failures the owner must act on, so the run can stop
+// with a clear message instead of a generic exit code. The CLI texts are NOT verified against a live
+// run (none was allowed); anything that does not match still fails closed with the generic code.
+const QUOTA_RE = /usage limit|rate[ -]?limit|quota|limit reached|too many requests|429/i;
+const AUTH_RE = /not logged in|log ?in required|please (?:run )?S*s*login|unauthori[sz]ed|401|invalid api key|authentication (?:failed|required|error)/i;
+
+function classifyCliFailure(text) {
+  const t = String(text || '');
+  if (QUOTA_RE.test(t)) return 'QUOTA_EXHAUSTED';
+  if (AUTH_RE.test(t)) return 'AUTH_REQUIRED';
+  return null;
+}
+
+module.exports = { AgentHaltError, SpendBlockedError, LoopDetectedError, AgentOutputError, AgentTransportError, classifyCliFailure };

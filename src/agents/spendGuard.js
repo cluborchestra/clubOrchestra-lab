@@ -9,7 +9,8 @@ const { SpendBlockedError, LoopDetectedError } = require('./errors');
 
 // Spend/rate guard for agent model calls. Every call goes:
 //   check()  BEFORE the call, under a ledger lock. Refuses (SpendBlockedError, nothing is called) if:
-//            - the provider is not enabled for the mode;
+//            - the provider is not enabled for the mode (replay: replay transport only;
+//              local-subscription: subscription-priced models only);
 //            - the model has no price;
 //            - the task's call budget is used up;
 //            - the estimate breaks the per-call cap;
@@ -79,11 +80,15 @@ class SpendGuard {
   // Returns a ticket for record()/fail(); throws SpendBlockedError (nothing is called) if any limit would break.
   check({ role, key, provider, model, input_tokens = 0, max_output_tokens = 0, estimate_usd, replay = false }) {
     const block = (code, message) => { throw new SpendBlockedError(code, message, { role, key, provider, model }); };
-    if (provider !== 'mock') {
-      if (this.limits.mode !== 'replay') block('REAL_AGENTS_DISABLED', `provider ${provider} not enabled (mode ${this.limits.mode})`);
-      if (replay !== true) block('REAL_AGENTS_DISABLED', `mode replay requires a replay transport (provider ${provider})`);
-    }
     const price = this._price(provider, model);
+    if (provider !== 'mock') {
+      if (this.limits.mode === 'replay') {
+        if (replay !== true) block('REAL_AGENTS_DISABLED', `mode replay requires a replay transport (provider ${provider})`);
+      } else if (this.limits.mode === 'local-subscription') {
+        // Free path: a live CLI, but only on a flat-rate subscription entry (never a paid price).
+        if (!price || price.subscription !== true) block('REAL_AGENTS_DISABLED', `mode local-subscription allows only subscription models (${provider}/${model})`);
+      } else block('REAL_AGENTS_DISABLED', `provider ${provider} not enabled (mode ${this.limits.mode})`);
+    }
     if (!price) block('PRICING_UNKNOWN', `no price configured for ${provider}/${model}`);
     let estimate = estimate_usd;
     if (!isCost(estimate)) {

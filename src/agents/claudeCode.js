@@ -27,7 +27,7 @@
 //                                comma-separated argument because tool patterns contain spaces
 //   --append-system-prompt <p>   our worker system prompt
 // --max-turns is NOT in 2.1.286's help, so it is not used (an unknown flag could fail the run).
-const { AgentOutputError, AgentTransportError } = require('./errors');
+const { AgentOutputError, AgentTransportError, classifyCliFailure } = require('./errors');
 const { isPlainObject } = require('../events');
 
 const WORKER_INSTRUCTIONS = 'Carry out the task in this handoff. When finished, reply with ONLY the from-worker '
@@ -37,12 +37,29 @@ const WORKER_INSTRUCTIONS = 'Carry out the task in this handoff. When finished, 
 // auth: 'api-key' (default; CI/Lot 3): --bare, so auth is strictly ANTHROPIC_API_KEY, plus a hard
 //        --max-budget-usd per run.
 //       'subscription' (free path, local only): the owner's Claude subscription login. --bare would
-//        refuse OAuth, so instead (all flags present in `claude --help` 2.1.289):
+//        refuse OAuth, so instead (flags in `claude --help` 2.1.289 unless marked docs):
 //          --safe-mode           disables CLAUDE.md, skills, plugins, hooks, MCP servers, custom agents …
-//          --setting-sources project   no user/local settings: only the disposable clone's project
+//          --restricted          removes Bash/PowerShell/REPL and other code-running tools unless --tools
+//                                names them, ignores user/project/local settings files, confines the
+//                                file tools to the working directories, refuses bypassPermissions and
+//                                lets only a person approve writes to settings, git and tool config
+//          --tools Read,Edit,Write,Glob,Grep   file tools only: no shell. The worker never runs git
+//                                or tests; the local runner commits and CI runs the tests (harness)
 //          --strict-mcp-config   no MCP servers (none are passed with --mcp-config)
+//          --settings {SETTINGS_FILE}  (still applies under --restricted) with
+//                                permissions.blockReadsOutsideWorkingDirectories = true (docs:
+//                                code.claude.com/docs/en/permissions, "Working directories")
+//          --allowedTools        path rules from limits, e.g. Read(./**),Edit(./**). Docs: Read/Edit
+//                                rules use gitignore syntax, ./ = the current directory; Edit rules
+//                                also cover the Write tool, and a Write(path) rule is never consulted
 //        --max-budget-usd is left out: its effect under a subscription is not verified (and a 0 cap
 //        could stop the run). Calls are still counted by the guard (max_calls_per_task).
+const SUBSCRIPTION_TOOLS = Object.freeze(['Read', 'Edit', 'Write', 'Glob', 'Grep']);
+const SUBSCRIPTION_SETTINGS = Object.freeze({ permissions: { blockReadsOutsideWorkingDirectories: true } });
+const SUBSCRIPTION_NOTE = 'You have file tools only (no shell). Do not run git or tests: the runner commits your '
+  + 'changes and CI runs the tests. Report ending_sha equal to the handoff starting_sha; the runner replaces it with '
+  + 'the real commit.';
+
 class ClaudeCodeHeadlessClient {
   constructor({ runner, limits, model, auth = 'api-key' }) {
     if (typeof runner !== 'function') throw new TypeError('runner must be a function');
@@ -53,16 +70,21 @@ class ClaudeCodeHeadlessClient {
 
   buildInvocation(request) {
     const cc = this.limits.claude_code;
-    const isolation = this.auth === 'subscription'
-      ? ['--safe-mode', '--setting-sources', 'project', '--strict-mcp-config', '--output-format', 'json']
+    const sub = this.auth === 'subscription';
+    const isolation = sub
+      ? ['--safe-mode', '--restricted', '--tools', SUBSCRIPTION_TOOLS.join(','), '--strict-mcp-config',
+        '--settings', '{SETTINGS_FILE}', '--output-format', 'json']
       : ['--bare', '--output-format', 'json', '--max-budget-usd', String(this.limits.per_call_max_usd)];
-    return {
+    const inv = {
       command: 'claude',
       argv: ['-p', ...isolation,
         '--permission-prompts', 'none', '--allowedTools', cc.allowed_tools.join(','), '--append-system-prompt', request.system],
-      stdin: `${WORKER_INSTRUCTIONS}\n\nHANDOFF:\n${JSON.stringify(request.input.handoff, null, 2)}\n`,
+      stdin: `${WORKER_INSTRUCTIONS}${sub ? ` ${SUBSCRIPTION_NOTE}` : ''}\n\nHANDOFF:\n${JSON.stringify(request.input.handoff, null, 2)}\n`,
       meta: { task_id: request.input.handoff.task_id, purpose: request.purpose, key: request.key },
     };
+    // The runner writes each file outside the working directory and substitutes {<NAME>_FILE}.
+    if (sub) inv.files = { settings: JSON.stringify(SUBSCRIPTION_SETTINGS) };
+    return inv;
   }
 
   estimate() {
@@ -78,7 +100,10 @@ class ClaudeCodeHeadlessClient {
       throw new AgentTransportError('TRANSPORT_ERROR', `claude-code: runner failed: ${err.code || err.message}`);
     }
     let r;
-    try { r = JSON.parse(out.stdout); } catch { throw new AgentTransportError('BAD_RESPONSE', `claude-code: stdout is not JSON (exit ${out.exit_code})`); }
+    try { r = JSON.parse(out.stdout); } catch {
+      const code = (out.exit_code !== 0 && classifyCliFailure(`${out.stderr || ''}\n${out.stdout || ''}`)) || 'BAD_RESPONSE';
+      throw new AgentTransportError(code, `claude-code: stdout is not JSON (exit ${out.exit_code})`, { stderr_tail: String(out.stderr || '').slice(-300) });
+    }
     if (!isPlainObject(r) || r.type !== 'result') throw new AgentTransportError('BAD_RESPONSE', 'claude-code: not a result object');
     const u = isPlainObject(r.usage) ? r.usage : null;
     const usage = u ? {
@@ -88,7 +113,9 @@ class ClaudeCodeHeadlessClient {
     const cost_usd = r.total_cost_usd; // validated by the guard; missing -> COST_UNKNOWN
     if (r.is_error === true || r.subtype !== 'success') {
       const sub = String(r.subtype || 'error').toUpperCase();
-      return { text: null, usage, cost_usd, error: new AgentOutputError(`claude-code: worker run ended with ${r.subtype} (is_error ${r.is_error})`, { num_turns: r.num_turns }, `WORKER_${sub}`) };
+      // A subscription that hit its usage limit or lost its login says so in the result text.
+      const code = classifyCliFailure(typeof r.result === 'string' ? r.result : '') || `WORKER_${sub}`;
+      return { text: null, usage, cost_usd, error: new AgentOutputError(`claude-code: worker run ended with ${r.subtype} (is_error ${r.is_error})`, { num_turns: r.num_turns }, code) };
     }
     if (typeof r.result !== 'string' || !r.result) {
       return { text: null, usage, cost_usd, error: new AgentOutputError('claude-code: empty result', {}, 'EMPTY_OUTPUT') };
@@ -97,4 +124,4 @@ class ClaudeCodeHeadlessClient {
   }
 }
 
-module.exports = { ClaudeCodeHeadlessClient, WORKER_INSTRUCTIONS };
+module.exports = { ClaudeCodeHeadlessClient, WORKER_INSTRUCTIONS, SUBSCRIPTION_TOOLS, SUBSCRIPTION_SETTINGS };

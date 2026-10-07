@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "_README": "Free path, LOCAL ONLY (CO-P3-FREE-002): used by harness/run-local-free.js on the owner's machine, never by CI or the orchestrator (they load config/agent-limits.json, mode mock). Planner = Codex CLI on the owner's ChatGPT subscription, worker = Claude Code on the owner's Claude subscription. Mode local-subscription accepts ONLY { subscription: true } entries and 0 USD caps, so no paid route can be configured here. Calls are still counted (max_calls_per_task, loop detector). Worker tools: file tools only (--restricted), path rules bound to the working directory (the disposable clone).",
+
+  "mode": "local-subscription",
+
+  "max_calls_per_task": { "planner": 4, "worker": 2 },
+  "max_output_tokens": { "planner": 2000, "worker": 8000 },
+  "loop_detect_repeats": 2,
+
+  "transport": { "max_retries": 0, "max_retry_after_s": 0, "backoff_ms": 0 },
+  "claude_code": { "version": "2.1.289", "allowed_tools": ["Read(./**)", "Edit(./**)"] },
+
+  "daily_spend_cap_usd": 0,
+  "per_call_max_usd": 0,
+
+  "pricing_usd_per_mtok": {
+    "openai/codex-exec": { "subscription": true },
+    "anthropic/claude-code-subscription": { "subscription": true }
+  }
+}

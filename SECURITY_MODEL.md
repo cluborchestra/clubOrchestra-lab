@@ -82,12 +82,16 @@ only that one. The worker key is never available there.
   `src/agents/claudeCode.js` builds the `claude` invocation and hands it to an injected `runner`.
   A test sets canary values in `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` and checks they never appear in
   any request, invocation, ledger or audit entry.
-- **Lot 3: exactly ONE file is exempt from the offline test:** `src/agents/live.js` (name reserved,
-  does not exist yet). It holds the live HTTP transport (adds `Authorization: Bearer
-  $OPENAI_API_KEY`) and the live `claude` runner (passes `ANTHROPIC_API_KEY` only into that child's
-  environment). It is the only place allowed `fetch`/`child_process`/`process.env`, and only for
-  those two key names. The exemption names that one path, and the offline test keeps checking
-  every other file.
+- **Exactly ONE agent file is exempt from the offline test: `src/agents/live.js`** (besides
+  `src/gitDiff.js`, read-only git). It exists since CO-P3-FREE-002 and today holds ONLY the local
+  free-path runner: it starts `codex`/`claude` for the owner's local run on existing subscriptions
+  (mode `local-subscription`). It refuses to run in CI, passes an environment ALLOWLIST to the
+  children (no API key, token, base URL or `NODE_OPTIONS` can pass), uses `shell: false`, kills a
+  timed-out process tree and caps output. The offline test checks it separately (its imports, the two
+  `process.env` defaults, `shell: false`) and that nothing but `harness/run-local-free.js` uses it.
+  - **Lot 3 (paid) would extend this same file** with the live HTTP transport (adds `Authorization:
+    Bearer $OPENAI_API_KEY`) and the API-key `claude` runner. That is NOT done and needs its own
+    approval.
 - **Async call path (decided and done in Lot 2b):**
   - The control plane, the adapters and the clients are `async`, so the live transport can be a
     plain `await fetch(...)` and the live runner a plain child process, with no bridge.
@@ -142,6 +146,33 @@ example). This is intentional, not a counting error:
   the future watchdog and reporting, the same way for both causes.
 - The true history is kept elsewhere: the audit log has every FAIL transition, and the escalation
   record (`kind: loop_detected`, `code: REPEATED_OUTPUT`) has the hash and the repeat count.
+
+## 4b2. Free path, local run (CO-P3-FREE-002)
+- **Where:** only on the owner's machine, started by the owner (`node harness/run-local-free.js
+  --start`). Not in CI (refused), not via the orchestrator (the default config is mode `mock`).
+- **No paid route:** mode `local-subscription` accepts only `{ subscription: true }` entries and 0 USD
+  caps; an API-key model has no entry and is refused before any process starts. Keys are stripped
+  from the child environment, so a CLI cannot silently fall back to an API account.
+- **Logins first:** `claude auth status` and `codex login status` (isolated `CODEX_HOME`); an API-key
+  login stops the run. Quota cannot be read without a call, so the first Claude call is a tiny read
+  probe and the first Codex call is the first plan; a quota/login failure there stops the run before
+  any task work (`QUOTA_EXHAUSTED` / `AUTH_REQUIRED`).
+- **Worker containment (Claude):** `--restricted` (no shell or code-running tools; file tools confined
+  to the working directory; git/settings writes need a person), `--tools Read,Edit,Write,Glob,Grep`,
+  `--settings` with `permissions.blockReadsOutsideWorkingDirectories: true`, path rules
+  `Read(./**)`, `Edit(./**)` (docs: an `Edit` rule also covers `Write`; a `Write(path)` rule is never
+  consulted), `--permission-prompts none`, cwd = a disposable clone in `%TEMP%` with no remote.
+  - **Read probe:** a canary file outside the clone; the worker is asked to read it. Token in the
+    output = LEAK (the run stops). A recorded permission denial = VERIFIED. Otherwise UNVERIFIED.
+  - The **runner** commits (the worker has no git), after checking the real change: every file in the
+    task's `allowed_scope` and none protected, `.git/config` and hooks unchanged. Only then do tests
+    run (tests execute code the worker wrote), with the same key-free environment. Git runs with no
+    system/global config, an empty hooks path and `--no-verify`.
+- **Planner containment (Codex):** `--sandbox read-only --cd <clone>`. Codex's read access outside
+  the clone is NOT verified (read-only means no writes).
+- **Residual risk (stated, not solved):** tests run worker-written code with the owner's user rights
+  (scope check first, disposable clone, no keys in the environment). A separate Windows user or
+  sandbox would be stronger; that is a separate decision.
 
 ## 4c. Protected paths, owner commands, pinned CLI (PRE3)
 - **Protected paths** (`src/protectedPaths.js`): the worker must never change its own rules.
@@ -220,6 +251,7 @@ example). This is intentional, not a counting error:
    for all of Lot 3; removing it is a later decision).
 5. Set real numbers in `config/agent-limits.json` (`_PRODUCT_OWNER_SETS_IN_LOT3`): the real
    prices for the models you choose, the daily cap and the per-call cap. Merge via PR.
-6. Approve one exempt file, `src/agents/live.js` (live transport + `claude` runner). The call path
-   is already async (Lot 2b), so it needs no bridge.
+6. Approve extending the exempt file `src/agents/live.js` (today: local free-path runner only) with
+   the live transport + API-key `claude` runner. The call path is already async (Lot 2b), so it needs
+   no bridge.
 7. First supervised run: one task, with the reviewer gate on.

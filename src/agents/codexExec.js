@@ -19,9 +19,11 @@
 //   --output-schema {SCHEMA_FILE} JSON Schema for the final answer (our strict plan/review schemas)
 //   --output-last-message {OUTPUT_FILE}  the final answer, read back as the response text
 //   --color never
+// Failures: exit != 0 -> PLANNER_EXIT, or QUOTA_EXHAUSTED / AUTH_REQUIRED when the CLI output says so
+// (classifyCliFailure; the texts are unverified, unmatched output still fails closed as PLANNER_EXIT).
 // Deliberately NOT used: --json (JSONL event format not verified), --search (web search), any
 // --dangerously-* flag, --add-dir, --full-auto/--approve-for-me.
-const { AgentOutputError, AgentTransportError } = require('./errors');
+const { AgentOutputError, AgentTransportError, classifyCliFailure } = require('./errors');
 const { SCHEMA_BY_PURPOSE } = require('./schemas');
 
 const PLANNER_ARGV = Object.freeze([
@@ -61,7 +63,12 @@ class CodexExecClient {
       if (err.code === 'ETIMEDOUT') throw new AgentTransportError('PLANNER_TIMEOUT', 'codex: planner run timed out');
       throw new AgentTransportError('TRANSPORT_ERROR', `codex: runner failed: ${err.code || err.message}`);
     }
-    if (out.exit_code !== 0) throw new AgentTransportError('PLANNER_EXIT', `codex: exited with ${out.exit_code}`);
+    if (out.exit_code !== 0) {
+      // Quota used up / not logged in get their own code so the run stops with a clear message.
+      const code = classifyCliFailure(`${out.stderr || ''}
+${out.stdout || ''}`) || 'PLANNER_EXIT';
+      throw new AgentTransportError(code, `codex: exited with ${out.exit_code}`, { stderr_tail: String(out.stderr || '').slice(-300) });
+    }
     const text = out.outputs && typeof out.outputs.last_message === 'string' ? out.outputs.last_message.trim() : '';
     if (!text) return { text: null, usage: null, error: new AgentOutputError('codex: no final message written', {}, 'EMPTY_OUTPUT') };
     return { text, usage: null };

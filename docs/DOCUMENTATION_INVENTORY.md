@@ -30,6 +30,7 @@ Ef skjölum ber ekki saman gildir:
 | [README.md](../README.md) | Fyrir forritara: keyrsla, próf, layout, tæknilýsing | ACTIVE | enska (tæknilegt) |
 | [SECURITY_MODEL.md](../SECURITY_MODEL.md) | Sérhæft öryggisskjal: lyklar og environments, ledger og concurrency, kill switches, Lot 3 checklist | ACTIVE; heldur sér sem sérhæft skjal | enska |
 | config/agent-limits.json | Kostnaðarþök og rate-mörk, auk festrar CLI-útgáfu. Stillingarskrá, ekki skjal; skráð hér af því að Ási setur þar tölur í Lot 3 | ACTIVE, vernduð | — |
+| config/agent-limits.local-free.json | Mörk fyrir staðbundna fría leið (hamur `local-subscription`: aðeins áskriftir, 0 USD, slóðareglur worker). Aðeins `harness/run-local-free.js` les hana | ACTIVE, vernduð | — |
 | config/protection.json | Viðbætur við verndaðar slóðir (gólfið er í kóða) og approvers fyrir `/approve` | ACTIVE, vernduð | — |
 
 ## Skýrslur og evidence

@@ -79,10 +79,12 @@ test('codex planner invocation: read-only exec with the strict schema; nothing u
   assert.deepEqual(JSON.parse(review.files.schema), REVIEW_SCHEMA);
 });
 
-test('claude worker on a subscription: no --bare / --max-budget-usd; safe-mode + project settings only + strict MCP', () => {
+test('claude worker on a subscription: no --bare / --max-budget-usd; safe-mode + restricted (file tools only) + strict MCP', () => {
   const sub = new ClaudeCodeHeadlessClient({ runner: makeReplayRunner({}), limits: FREE, auth: 'subscription' });
   const inv = sub.buildInvocation({ purpose: 'work', key: 'T', system: 'SYS', input: { handoff: { task_id: 'T' } } });
-  assert.deepEqual(inv.argv.slice(0, 9), ['-p', '--safe-mode', '--setting-sources', 'project', '--strict-mcp-config', '--output-format', 'json', '--permission-prompts', 'none']);
+  // CO-P3-FREE-002: --restricted replaces --setting-sources project (it ignores user/project/local settings too).
+  assert.deepEqual(inv.argv.slice(0, 13), ['-p', '--safe-mode', '--restricted', '--tools', 'Read,Edit,Write,Glob,Grep', '--strict-mcp-config',
+    '--settings', '{SETTINGS_FILE}', '--output-format', 'json', '--permission-prompts', 'none', '--allowedTools']);
   assert.ok(!inv.argv.includes('--bare') && !inv.argv.includes('--max-budget-usd'));
   assert.equal(sub.model, 'claude-code-subscription');
   // The API-key mode (CI, Lot 3) is unchanged.

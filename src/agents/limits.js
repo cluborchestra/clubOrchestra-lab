@@ -9,9 +9,15 @@ const path = require('node:path');
 // Modes: 'sim'    sim stubs only
 //        'mock'   mock model client only (provider 'mock')
 //        'replay' real API request/response shapes, served by a replay transport/runner (Lot 2)
-//        'real'   live agents: refused until P3 Lot 3 is approved
+//        'local-subscription'  free path, owner's machine only (CO-P3-FREE-002): live CLIs on the
+//                 owner's EXISTING subscriptions. Every non-mock price must be { subscription: true },
+//                 both caps must be 0 USD, and the worker's tool rules must be Read(./…)/Edit(./…)
+//                 path rules inside the working directory. So no paid route can be configured.
+//        'real'   live paid agents: refused until P3 Lot 3 is approved
 const DEFAULT_LIMITS_PATH = path.join(__dirname, '..', '..', 'config', 'agent-limits.json');
-const ALLOWED_MODES = Object.freeze(['sim', 'mock', 'replay']);
+const ALLOWED_MODES = Object.freeze(['sim', 'mock', 'replay', 'local-subscription']);
+// Read(./path) / Edit(./path): anchored at the working directory, no parent, home or absolute paths.
+const LOCAL_TOOL_RULE = /^(Read|Edit)\(\.\/[^()~\\]*\)$/;
 const ROLES = Object.freeze(['planner', 'worker']);
 const FAKE_PRICING_NOTE = 'FAKE — not real pricing';
 
@@ -54,6 +60,17 @@ function validateLimits(l) {
     // subscription: an existing flat-rate plan (free path); 0 USD per call, still counted by the guard.
     const subscription = price && price.subscription === true && Object.keys(price).length === 1;
     if (!tokenPriced && !reported && !subscription) errors.push(`pricing_usd_per_mtok.${model} needs input/output >= 0, reported_cost: true, or subscription: true`);
+  }
+  if (l.mode === 'local-subscription') {
+    if (p && typeof p === 'object') {
+      for (const [model, price] of Object.entries(p)) {
+        if (!model.startsWith('mock/') && !(price && price.subscription === true)) errors.push(`local-subscription: ${model} must be { subscription: true } (no paid route)`);
+      }
+    }
+    if (l.daily_spend_cap_usd !== 0 || l.per_call_max_usd !== 0) errors.push('local-subscription: daily_spend_cap_usd and per_call_max_usd must be 0');
+    for (const rule of (cc && Array.isArray(cc.allowed_tools) ? cc.allowed_tools : [])) {
+      if (!LOCAL_TOOL_RULE.test(rule) || rule.includes('..')) errors.push(`local-subscription: tool rule ${rule} must be Read(./…) or Edit(./…) inside the working directory`);
+    }
   }
   // Until real agents are approved, any non-mock price must be explicitly marked as fake.
   if (nonMockPrices && l.mode !== 'real' && l._PRICING_NOTE !== FAKE_PRICING_NOTE) {

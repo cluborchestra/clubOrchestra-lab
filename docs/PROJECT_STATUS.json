@@ -24,7 +24,7 @@
     "agents": "simulated only; no API keys exist; no live transport in code",
     "spend_to_date_usd": 0
   },
-  "current_work_package": "CO-P3-FREE-001",
+  "current_work_package": "CO-P3-FREE-002",
   "capability_matrix": {
     "control_plane_p1": {
       "state": "LIVE",
@@ -124,21 +124,24 @@
       "enabled": false
     },
     "free_path_subscriptions": {
-      "state": "IMPLEMENTED_TESTED_REPLAY",
+      "state": "IMPLEMENTED_TESTED_FAKE_CLI",
       "planner": "Codex CLI codex-cli 0.160.1 (installed in runs/tools/codex, gitignored); codex exec --sandbox read-only --output-schema",
-      "worker": "Claude Code on subscription: -p --safe-mode --setting-sources project --strict-mcp-config (no --bare)",
+      "worker": "Claude Code on subscription: -p --safe-mode --restricted --tools Read,Edit,Write,Glob,Grep --settings (blockReadsOutsideWorkingDirectories) --allowedTools Read(./**),Edit(./**); no --bare; the runner commits and runs tests",
       "cost": "subscription pricing type: 0 USD per call, calls still counted",
       "ci_with_subscription": "NO for now (Product Owner decision after local test)",
-      "local_real_run": "PLANNED (needs approval: live runner + owner logins)",
-      "evidence": "evidence/CO-P3-FREE-001.md"
+      "local_real_run": "READY; test 1 not run (owner starts it after logging in)",
+      "evidence": "evidence/CO-P3-FREE-002.md",
+      "live_runner": "src/agents/live.js (mode local-subscription only; refuses CI; env allowlist)",
+      "run_script": "harness/run-local-free.js (--start required; login checks; quota stop; read probe; disposable clone in %TEMP%)",
+      "read_outside_clone": "design + fake-CLI tests; live proof = read probe in test 1 (VERIFIED / UNVERIFIED / LEAK)"
     }
   },
   "tests": {
     "local": {
-      "total": 155,
-      "passed": 155,
+      "total": 171,
+      "passed": 171,
       "failed": 0,
-      "branch": "feat/co-p3-free-001",
+      "branch": "feat/co-p3-free-002",
       "network_trap": true
     },
     "github_ci": {

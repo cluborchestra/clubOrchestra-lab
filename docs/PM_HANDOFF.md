@@ -25,7 +25,8 @@ raunverulegir agentar eru til, engir lyklar, og eytt hefur verið 0 USD.
 | P3 Lot 2b + escalation + skjölun | ACCEPTED |
 | PRE3 (verndaðar slóðir, `/approve`, fest CLI) | ACCEPTED (2026-10-06) |
 | PRE3b (vörnin ver sjálfa sig: `src/**`, `test/support/**`, `.gitattributes`, `.gitmodules`) | ACCEPTED (2026-10-06) |
-| CO-P3-FREE-001 (frí leið: Claude Max + ChatGPT/Codex) | Í QA: Codex CLI 0.160.1 uppsett í repo-möppu; adapter + 9 replay-próf; 155/155 græn. Staðbundin raunprófun: aðeins plan |
+| CO-P3-FREE-001 (frí leið: Claude Max + ChatGPT/Codex) | ACCEPTED (PM 2026-10-07) |
+| CO-P3-FREE-002 (staðbundinn runner + keyrsluskrifta) | Í QA: 16 ný próf (fölsuð CLI); 171/171 græn. Ekkert módelkall. Próf 1 bíður þess að Ási ræsi það |
 
 Tvítekningarprófið er VERIFIED í dry-run; live-útgáfan er frestuð (B5).
 
@@ -34,7 +35,7 @@ Tvítekningarprófið er VERIFIED í dry-run; live-útgáfan er frestuð (B5).
 - **`docs/co-p2b-e2e-status`:** pushuð; PR ekki staðfest.
 
 ## NOW
-QA á CO-P3-FREE-001 ([evidence](../evidence/CO-P3-FREE-001.md)). 1a Claude-áskrift: GO staðbundið. 1b Codex: GO (exec, `--output-schema`, `read-only` staðfest). 1c CI með áskrift: NEI í bili (Ási).
+QA á CO-P3-FREE-002 ([evidence](../evidence/CO-P3-FREE-002.md)). Þegar samþykkt: Ási skráir sig inn og ræsir próf 1 (`node harness/run-local-free.js --start`).
 
 ## NEXT
 1. Opna og mergea eina PR-ið (`feat/co-p3-pre3-001 → main`, merge commit) þegar Actions er stöðugt. Þá virkjast `approval.yml`.
@@ -52,11 +53,11 @@ B5: live tvítekningarpróf bíður heilbrigðra GitHub runners.
    2. **budget hjá veitendum (SKYLDA);**
    3. lyklar í `agents-planner` / `agents-worker`;
    4. verð planner-módels;
-   5. undanþága fyrir `src/agents/live.js`.
+   5. útvíkkun `src/agents/live.js` (í dag aðeins staðbundinn áskriftar-runner) með greiddum transport.
 2. Merge á biðgreinum.
 3. Tímasetning B5.
 4. Approvers-listi (í dag aðeins `cluborchestra`).
-5. **Frí leið, staðbundin raunprófun:** samþykkja (a) að byggja staðbundinn runner (`src/agents/live.js`, eina undanþegna skráin) og keyrsluskriftu, og (b) að Ási skrái sig inn (Codex: `codex login` í einangraðri `CODEX_HOME`; Claude: áskrift). Síðan keyrir Ási eitt verk eftir planinu í evidence.
+5. **Frí leið:** (a) Ási ræsir próf 1 sjálfur eftir innskráningu (skref í evidence/CO-P3-FREE-002.md); (b) samþykkja eða hafna plani fyrir próf 2 (raunverulegt forritunarverk) eftir niðurstöðu prófs 1.
 
 ## IMPORTANT BOUNDARIES
 - Ekkert kostar án „já“ frá Ása.
