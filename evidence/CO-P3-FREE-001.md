@@ -29,8 +29,9 @@ opnaði hliðið 2026-10-07.
 - **Pakkar:** 2.
   - `@openai/codex@0.160.1`: `sha512-f1yrJhwgimKQI1kYQlxdPJcFwkNZxZrbz7Hf89EAcnLqkQ7TiESzr2FgSZn13Ga5RuHjlVUfurzwq10wk9zw2g==`
   - `@openai/codex-win32-x64@0.160.1-win32-x64`: `sha512-yyqykHtHNhm0ZViofGozz9a4ffUyXDsiyRu9Q2hPNg/cu4uzSsovNr5kDmzBXPFWAilmlZuNkwpw1W7uae2nlg==`
-- **Einangrun:** `CODEX_HOME` = `runs/tools/codex-home` (gitignored), svo ekkert var lesið úr eða
-  skrifað í `~/.codex` Ása. Sú mappa er enn ekki til.
+- **Einangrun:** `CODEX_HOME` = `runs/tools/codex-home` (gitignored).
+  - Ekkert var lesið úr eða skrifað í `~/.codex` Ása; sú mappa er ekki til.
+  - Í `runs/tools/codex-home` bjó `--help` aðeins til `tmp/arg0`. Þar eru engin auth-gögn.
 
 **Keyrt (aðeins):** `codex --version` (`codex-cli 0.160.1`), `codex --help`, `codex exec --help`,
 `codex login --help`, `codex logout --help` og `codex features --help`.
@@ -217,4 +218,9 @@ sjálfkrafa):
 - Ekkert á `co/` eða í `main`. Push-niðurstaða er neðst.
 
 ## Push
-_(fyllt út eftir push)_
+- `git push origin feat/co-p3-free-001`: haus `a788da2` (kóði `d6b6514` + evidence). Auðkenni er
+  `cluborchestra` með noreply-netfangi.
+- **Engin Actions-keyrsla ræstist:** heildarfjöldinn var 5 fyrir og 5 eftir.
+- **Óbreytt á remote:** `main` = `1597f1b`, `orchestra-state` = `66cee56`,
+  `co/CO-SIM-001` = `d59516a`. Engin ný `co/` grein.
+- `~/.codex` er ekki til, svo Codex snerti ekkert utan repo-sins.
